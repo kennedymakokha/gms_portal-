@@ -14,6 +14,10 @@ import VisitRoutes from './routes/visit';
 import Drugroutes from './routes/drugs';
 import Labroutes from './routes/labs';
 import procedureroutes from './routes/procedure';
+import patientHisory from './routes/patientHistory';
+import patientLabResults from './routes/patientLabResults';
+import patientProcedures from './routes/patientProcedures';
+import patientMedications from './routes/patientMedication';
 dotenv.config();
 
 const app = express();
@@ -37,6 +41,11 @@ app.use('/api', VisitRoutes);
 app.use('/api', Drugroutes);
 app.use('/api', Labroutes);
 app.use('/api', procedureroutes);
+app.use('/api', patientHisory);
+app.use('/api', patientLabResults);
+app.use('/api', patientProcedures);
+app.use('/api', patientMedications);
+
 
 // Start
 const start = async () => {
