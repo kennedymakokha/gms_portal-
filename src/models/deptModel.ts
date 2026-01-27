@@ -4,6 +4,7 @@ export interface IDepartment extends Document {
   name: string;
   description?: string;
   uuid: string;
+  clinic?: string;
   created_by?: Schema.Types.ObjectId;
   deletedAt?: Date | null;
   isDeleted: boolean
@@ -11,6 +12,7 @@ export interface IDepartment extends Document {
 
 const DepartmentSchema = new Schema<IDepartment>({
   name: { type: String, required: true, unique: true },
+  clinic: { type: String },
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
   uuid: { type: String, unique: true },
   description: { type: String },

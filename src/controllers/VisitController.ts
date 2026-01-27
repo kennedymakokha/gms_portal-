@@ -10,19 +10,13 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
   try {
     const { uuid, patientId, notes, visitDate } = req.body;
 
+    req.body.clinic = req.user?.clinicId;
     // Atomic upsert: find by uuid, insert if not exists
-    const visit = await Visits.findOneAndUpdate(
-      { uuid },
-      {
-        $setOnInsert: {
-          patientuuid: patientId,
-          notes: notes || '',
-          visitDate: visitDate ? new Date(visitDate) : new Date(),
-        },
-      },
-      { new: true, upsert: true } // atomic insert-or-update
-    );
+    req.body.created_by = req.user?.id;
 
+    const visit = new Visits(req.body);
+    let v = await visit.save();
+    console.log(v)
     res.status(201).json({
       message: ' Visit saved successfully',
       visit,
@@ -40,8 +34,9 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
 // ----------------------
 export const getvisits = async (req: AuthRequest, res: Response) => {
   try {
-    const visits = await Visits.find({ deletedAt: null })
-      .lean();
+
+    const visits = await Visits.find({   clinic: req.user?.clinicId });
+
 
     res.json(visits);
   } catch (error: any) {

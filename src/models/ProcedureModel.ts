@@ -3,9 +3,9 @@ import { Schema, model, Document } from 'mongoose';
 export interface IProcedure extends Document {
   procedureName: string;
   description?: string;
-  cost:string;
+  cost: string;
   uuid: string;
-  clinic: Schema.Types.ObjectId;
+  clinic: string;
   created_by?: Schema.Types.ObjectId;
   deletedAt?: Date | null;
   isDeleted: boolean
@@ -14,7 +14,7 @@ export interface IProcedure extends Document {
 const ProcedureScema = new Schema<IProcedure>({
   procedureName: { type: String, required: true, unique: true },
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
-  clinic: { type: Schema.Types.ObjectId, ref: 'clinic' },
+  clinic: { type: String },
   uuid: { type: String, unique: true },
   cost: { type: String },
   description: { type: String },

@@ -7,7 +7,7 @@ import { Types } from "mongoose";
 export const getProcedures = async (req: AuthRequest, res: Response) => {
   try {
    
-    const procedures = await Procedures.find({ deletedAt: null, isDeleted: false });
+    const procedures = await Procedures.find({ deletedAt: null, isDeleted: false, clinic: req.user?.clinicId });
     res.json(procedures);
   } catch (error: any) {
     res.status(500).json({ message: error.message });

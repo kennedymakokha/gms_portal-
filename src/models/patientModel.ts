@@ -1,10 +1,11 @@
 import { Schema, model, Types } from 'mongoose';
 
 export interface IPatient {
+
   uuid: string; //  FIX: must be a string, not schema syntax
   age: string;
   phone?: string;
-  name:string
+  name: string
   nokName?: string;
   nokRelationship?: string;
   nokPhone?: string;
@@ -22,7 +23,9 @@ export interface IPatient {
 //             nokRelationship TEXT, 
 //             nokPhone TEXT,
 const PatientSchema = new Schema<IPatient>(
+
   {
+  
     uuid: {
       type: String,
       unique: true,

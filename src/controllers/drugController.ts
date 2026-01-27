@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import Drugs from '../models/deptModel';
-import clinicModel from '../models/clinicModel';
+
 
 export const getDrugs = async (req: AuthRequest, res: Response) => {
   try {
@@ -23,25 +23,18 @@ export const getDrugs = async (req: AuthRequest, res: Response) => {
 export const createDrug = async (req: AuthRequest, res: Response) => {
   try {
     const { name, price, uuid, clinic, stock } = req.body;
-  
-    // check by uuid first, fallback to name
+
     const existing = await Drugs.findOne({ $or: [{ uuid }, { name }] });
     if (existing) {
       return res.status(200).json(existing); // already exists, return it
     }
-
-    const dept = new Drugs({
-      uuid,
-      name,
-      clinic,
-      price, stock,
-      created_by: req.user?.id
-    });
-
-    let V = await dept.save();
-    console.log("DRUG after", V)
+    req.body.clinic = req.user?.clinicId;
+    req.body.created_by = req.user?.id;
+    const dept = new Drugs(req.body);
+    await dept.save();
     res.status(201).json(dept);
   } catch (error: any) {
+    console.log(error)
     res.status(500).json({ message: error.message });
   }
 };

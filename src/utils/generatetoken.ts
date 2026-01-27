@@ -11,7 +11,7 @@ const generateTokens = (user: any) => {
       clinicId: user.clinic?._id // ✅ include clinicId here
     },
     process.env.JWT_SECRET || "development_secret_key_change_in_prod",
-    { expiresIn: "1h" } // Short expiration
+    { expiresIn: "14d" } // Short expiration
   );
 
   const refreshToken = jwt.sign(
