@@ -2,13 +2,10 @@ import express from 'express';
 const router = express.Router();
 import { authenticate, authorize } from '../middleware/auth';
 import { UserRole } from '../models/userModel';
-
-
-import { createMedications, getMedications } from '../controllers/patientsMedications';
-
-
-router.post('/patient-lab-results', authenticate, authorize([UserRole.ADMIN]), createMedications);   // Create
-router.get('/patient-lab-results', authenticate, authorize([UserRole.ADMIN]), getMedications);      // Read
+import { getLabResults } from '../controllers/patientsLabResults';
+import { createLabResults } from '../controllers/patientsLabResults';
+router.post('/patient-lab-results', authenticate, authorize([UserRole.ADMIN]), createLabResults);   // Create
+router.get('/patient-lab-results', authenticate, authorize([UserRole.ADMIN]), getLabResults);      // Read
 
 
 export default router;

@@ -52,15 +52,15 @@ export const updateDepartment = async (req: AuthRequest, res: Response) => {
 // DELETE
 export const harddeleteDepartment = async (req: AuthRequest, res: Response) => {
   try {
-    console.log('PARAMS:', req.params);
+ 
 
     const { id } = req.params; // or uuid — whichever you chose
-    console.log('DELETE ID:', id);
+    
 
     const dept = await Department.findOneAndDelete({ uuid: id });
 
     if (!dept) {
-      console.log(' No department found for uuid:', id);
+     
       return res.status(404).json({ error: 'Department not found' });
     }
 

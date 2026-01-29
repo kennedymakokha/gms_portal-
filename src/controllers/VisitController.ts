@@ -8,21 +8,33 @@ import Visits, { IVisits } from '../models/visitModel';
 
 export const createVisit = async (req: AuthRequest, res: Response) => {
   try {
-    const { uuid, patientId, notes, visitDate } = req.body;
+    const { uuid } = req.body;
 
-    req.body.clinic = req.user?.clinicId;
-    // Atomic upsert: find by uuid, insert if not exists
-    req.body.created_by = req.user?.id;
+    if (!uuid) {
+      return res.status(400).json({ error: 'uuid is required' });
+    }
 
-    const visit = new Visits(req.body);
-    let v = await visit.save();
-    console.log(v)
+    const payload = {
+      ...req.body,
+      clinic: req.user?.clinicId,
+      created_by: req.user?.id,
+    };
+
+    const visit = await Visits.findOneAndUpdate(
+      { uuid },                 // 🔑 idempotency key
+      { $setOnInsert: payload },// only insert once
+      {
+        upsert: true,
+        new: true,              // return existing or inserted doc
+      }
+    );
+
     res.status(201).json({
-      message: ' Visit saved successfully',
+      message: 'Visit saved successfully',
       visit,
     });
   } catch (error: any) {
-    console.error(' Error saving visit:', error);
+    console.error('Error saving visit:', error);
     res.status(500).json({ error: error.message });
   }
 };

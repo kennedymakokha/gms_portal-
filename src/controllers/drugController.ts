@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import Drugs from '../models/deptModel';
+import Drugs from '../models/drugsModel';
 
 
 export const getDrugs = async (req: AuthRequest, res: Response) => {
@@ -22,17 +22,29 @@ export const getDrugs = async (req: AuthRequest, res: Response) => {
 
 export const createDrug = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, price, uuid, clinic, stock } = req.body;
-
-    const existing = await Drugs.findOne({ $or: [{ uuid }, { name }] });
-    if (existing) {
-      return res.status(200).json(existing); // already exists, return it
-    }
-    req.body.clinic = req.user?.clinicId;
-    req.body.created_by = req.user?.id;
-    const dept = new Drugs(req.body);
-    await dept.save();
-    res.status(201).json(dept);
+    const { uuid, name, price, stock } = req.body;
+    const drug = await Drugs.findOneAndUpdate(
+      { uuid },
+      {
+        $set: {
+          name,
+          price,
+          stock,
+          clinic: req.user?.clinicId,
+          isDeleted: req.body.isDeleted ?? false,
+          updated_at: new Date(),
+        },
+        $setOnInsert: {
+          created_by: req.user?.id,
+          created_at: new Date(),
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+      }
+    );
+    res.status(201).json(drug);
   } catch (error: any) {
     console.log(error)
     res.status(500).json({ message: error.message });
@@ -56,10 +68,10 @@ export const updateDrug = async (req: AuthRequest, res: Response) => {
 // DELETE
 export const harddeleteDrug = async (req: AuthRequest, res: Response) => {
   try {
-    console.log('PARAMS:', req.params);
+
 
     const { id } = req.params; // or uuid — whichever you chose
-    console.log('DELETE ID:', id);
+
 
     const dept = await Drugs.findOneAndDelete({ uuid: id });
 

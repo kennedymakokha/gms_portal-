@@ -20,47 +20,86 @@ export const createpatient = async (req: AuthRequest, res: Response) => {
   session.startTransaction();
 
   try {
-    const { uuid, name, notes, visitDate } = req.body as IVisits & { name?: string };
-    // 1️⃣ Find or create patient
-    let patient = await Patient.findOne({ $or: [{ uuid }, { name }] }).session(session);
+    const {
+      uuid,
+      name,
+      dob,
+      sex,
+      phone,
+      nationalId,
+      nokName,
+      nokRelationship,
+      nokPhone,
+      history,
+      isDeleted = false,
+    } = req.body;
 
-    if (!patient) {
-      req.body.created_by = req.user?.id
-
-      patient = new Patient(req.body);
-      await patient.save({ session });
+    if (!uuid) {
+      return res.status(400).json({ message: 'Patient uuid is required' });
     }
 
-    // 2️⃣ Create visit / visit
-    // const visitdata = new Visits({
-    //   uuid: generateUnifiedId('visit'),
-    //   patientuuid: patient.uuid,
-    //   notes: notes || '',
-    //   visitDate: visitDate ? new Date(visitDate) : new Date(),
-    // });
+    if (!name || !dob || !sex) {
+      return res.status(400).json({
+        message: 'name, dob and sex are required',
+      });
+    }
 
-    // await visitdata.save({ session });
+    const update = {
+      $set: {
+        name,
+        dob,
+        sex,
+        phone,
+        nationalId,
+        nokName,
+        nokRelationship,
+        nokPhone,
+        history,
+        isDeleted,
+        clinic: req.user?.clinicId,
+        updatedAt: new Date(),
+      },
+      $setOnInsert: {
+        uuid,
+        created_by: req.user?.id,
+        createdAt: new Date(),
+      },
+    };
+
+    const patient = await Patient.findOneAndUpdate(
+      { uuid },          // 🔑 idempotency key
+      update,
+      {
+        upsert: true,
+        new: true,
+        session,
+      }
+    );
 
     await session.commitTransaction();
     session.endSession();
 
     res.status(201).json({
-      message: ' visit saved successfully',
+      message: isDeleted ? 'Patient deleted' : 'Patient saved',
       patient,
-      // visitdata,
     });
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
-    console.error(' Error saving visit:', error);
+    console.error('Error saving patient:', error);
     res.status(500).json({ error: error.message });
   }
 };
 
+
+
 export const getpatients = async (req: AuthRequest, res: Response) => {
   try {
-
-    const patients = await Patient.find({ deletedAt: null, isDeleted: false, clinic: req.user?.clinicId });
+    const patients = await Patient.find({
+      clinic: req.user?.clinicId,
+      deletedAt: null,
+      $or: [{ isDeleted: false }, { isDeleted: null }],
+    });
 
     res.json(patients);
   } catch (error: any) {
@@ -68,27 +107,6 @@ export const getpatients = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// export const createpatient = async (req: AuthRequest, res: Response) => {
-//   try {
-//     const { uuid, name, } = req.body;
-
-//     // check by uuid first, fallback to name
-//     const existing = await Patient.findOne({ $or: [{ uuid }, { name }] });
-//     if (existing) {
-//       return res.status(200).json(existing); // already exists, return it
-//     }
-//     req.body.created_by = req.user?.id
-//     req.body.clinic = req.user?.clinic?._id
-//     const dept = new Patient(req.body);
-
-//     await dept.save();
-//     res.status(201).json(dept);
-//   } catch (error: any) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// controllers/patientController.js
 
 
 
@@ -107,10 +125,10 @@ export const updatepatient = async (req: AuthRequest, res: Response) => {
 // DELETE
 export const harddeletepatient = async (req: AuthRequest, res: Response) => {
   try {
-    console.log('PARAMS:', req.params);
+
 
     const { id } = req.params; // or uuid — whichever you chose
-    console.log('DELETE ID:', id);
+
 
     const dept = await Patient.findOneAndDelete({ uuid: id });
 

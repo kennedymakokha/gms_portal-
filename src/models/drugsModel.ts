@@ -11,7 +11,7 @@ export interface IDrug extends Document {
   name: string;
   price?: string;
   uuid: string;
-  clinic: Schema.Types.ObjectId;
+  clinic: string;
   stock: number;
   created_by?: Schema.Types.ObjectId;
   deletedAt?: Date | null;
@@ -22,7 +22,7 @@ export interface IDrug extends Document {
 const DrugSchema = new Schema<IDrug>({
   name: { type: String, required: true, unique: true },
   price: { type: String },
-  clinic: { type: Schema.Types.ObjectId, ref: 'clinic' },
+  clinic: { type: String },
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
   uuid: { type: String, unique: true },
   stock: { type: Number },

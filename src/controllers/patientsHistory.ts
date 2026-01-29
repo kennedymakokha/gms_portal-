@@ -15,7 +15,7 @@ export const getHistory = async (req: AuthRequest, res: Response) => {
 
 export const createHistory = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, price, uuid, clinic, stock } = req.body;
+    const { uuid } = req.body;
 
     // check by uuid first, fallback to name
     const existing = await History.findOne({ $or: [{ uuid }] });
@@ -24,11 +24,11 @@ export const createHistory = async (req: AuthRequest, res: Response) => {
     }
     req.body.clinic = req.user?.clinicId;
     req.body.created_by = req.user?.id;
-    const dept = new History(req.body);
+    const detail = new History(req.body);
 
-    let V = await dept.save();
-    console.log("DRUG after", V)
-    res.status(201).json(dept);
+    let V = await detail.save();
+
+    res.status(201).json(detail);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

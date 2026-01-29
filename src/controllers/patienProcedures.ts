@@ -27,7 +27,7 @@ export const createPatientProcedures = async (req: AuthRequest, res: Response) =
     const dept = new PatientProcedures(req.body);
 
     let V = await dept.save();
-    console.log("DRUG after", V)
+  
     res.status(201).json(dept);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
