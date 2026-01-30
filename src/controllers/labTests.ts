@@ -25,17 +25,31 @@ export const getLabs = async (req: AuthRequest, res: Response) => {
 
 export const createlab = async (req: AuthRequest, res: Response) => {
     try {
-        const { testName, uuid } = req.body;
-        // check by uuid first, fallback to name
-        const existing = await Labs.findOne({ $or: [{ uuid }, { testName }] });
-        if (existing) {
-            return res.status(200).json(existing); // already exists, return it
-        }
+        console.log(req.body)
+        const { testName, uuid, price } = req.body;
+        const lab = await Labs.findOneAndUpdate(
+            { uuid },
+            {
+                $set: {
+                    testName,
+                    price,
 
-        req.body.created_by = req.user?.id;
-        const dept = new Labs(req.body);
-        let lab = await dept.save();
-        res.status(201).json(dept);
+                    clinic: req.user?.clinicId,
+                    isDeleted: req.body.isDeleted ?? false,
+                    updated_at: new Date(),
+                },
+                $setOnInsert: {
+                    created_by: req.user?.id,
+                    created_at: new Date(),
+                },
+            },
+            {
+                upsert: true,
+                new: true,
+            }
+        );
+        res.status(201).json(lab);
+      
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }

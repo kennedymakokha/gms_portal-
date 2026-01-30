@@ -5,6 +5,7 @@ export interface ILab extends Document {
   description?: string;
   uuid: string;
   clinic: Schema.Types.ObjectId;
+  price: string;
   created_by?: Schema.Types.ObjectId;
   deletedAt?: Date | null;
   isDeleted: boolean
@@ -16,7 +17,7 @@ const LabSchema = new Schema<ILab>({
   clinic: { type: Schema.Types.ObjectId, ref: 'clinic' },
   uuid: { type: String, unique: true },
   description: { type: String },
-
+  price: { type: String },
   isDeleted: {
     type: Boolean,
     default: false,

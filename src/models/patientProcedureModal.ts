@@ -8,6 +8,7 @@ export interface IPprocedures extends Document {
   status: string;
   notes: string;
   createdAt: string;
+  price:string;
   visitId: string;
   clinic?: Schema.Types.ObjectId;
   description?: string;
@@ -24,6 +25,7 @@ const patientProceduresSchema = new Schema<IPprocedures>({
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
   procedureId: String,
   procedureName: String,
+  price:String,
   status: String,
   notes: String,
   visitId: String,

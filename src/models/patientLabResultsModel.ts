@@ -9,6 +9,7 @@ export interface IPlabResults extends Document {
   testName: string;
   result: string;
   createdAt: string;
+  price:string;
   clinic?: Schema.Types.ObjectId;
   description?: string;
   created_by?: Schema.Types.ObjectId;
@@ -23,6 +24,7 @@ const patientMedicationsSchema = new Schema<IPlabResults>({
   clinic: { type: Schema.Types.ObjectId, ref: 'Clinic' },
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
   testId: String,
+  price:String,
   testName: String,
   result: String,
   createdAt: String,

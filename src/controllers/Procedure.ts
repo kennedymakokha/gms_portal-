@@ -17,13 +17,14 @@ export const getProcedures = async (req: AuthRequest, res: Response) => {
 
 export const createProcedure = async (req: AuthRequest, res: Response) => {
   try {
-    const { uuid, description, cost, procedureName } = req.body;
+    console.log(req.body)
+    const { uuid, description, price, procedureName } = req.body;
     const drug = await Procedures.findOneAndUpdate(
       { uuid },
       {
         $set: {
           procedureName,
-          cost,
+          price,
           description,
           clinic: req.user?.clinicId,
           isDeleted: req.body.isDeleted ?? false,
