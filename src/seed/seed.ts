@@ -36,7 +36,7 @@ const seed = async () => {
 
     console.log('🔹 Seeding Users...');
     const userData = [
-      { name: 'Garage Admin', phone_number: '0700000000', password: 'admin123', role: UserRole.ADMIN, departmentCode: 'MGMT' },
+      { name: 'Garage Admin', phone_number: '0700000000', password: 'admin123', role: UserRole.admin, departmentCode: 'MGMT' },
       { name: 'Clarissa Clerk', phone_number: '0700000001', password: 'clerk123', role: UserRole.CLERK, departmentCode: 'FDSK' },
       { name: 'Mike Engine', phone_number: '0700000002', role: UserRole.MECHANIC, departmentCode: 'ENG' },
       { name: 'Tom Trans', phone_number: '0700000003', role: UserRole.MECHANIC, departmentCode: 'TRANS' }

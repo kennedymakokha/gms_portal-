@@ -6,11 +6,11 @@ import { deleteUser, login, register, syncUsers, updateUser } from '../controlle
 import { getclinics, saveclinic } from '../controllers/clinicController';
 
 
-router.post('/clinic', authenticate, authorize([UserRole.ADMIN]), saveclinic);   // Create
+router.post('/clinic', authenticate, authorize([UserRole.admin]), saveclinic);   // Create
 router.get('/clinic', getclinics);      // Read
-router.put('/clinic/:id', authenticate, authorize([UserRole.ADMIN]), updateUser); // Update
-router.delete('/clinic/:id', authenticate, authorize([UserRole.ADMIN]), deleteUser); // Delete
-router.get('/clinic', authenticate, authorize([UserRole.ADMIN]), syncUsers); // sync
+router.put('/clinic/:id', authenticate, authorize([UserRole.admin]), updateUser); // Update
+router.delete('/clinic/:id', authenticate, authorize([UserRole.admin]), deleteUser); // Delete
+router.get('/clinic', authenticate, authorize([UserRole.admin]), syncUsers); // sync
 
 
 export default router;

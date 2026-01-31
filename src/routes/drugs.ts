@@ -5,9 +5,9 @@ import { UserRole } from '../models/userModel';
 import { createDrug, deleteDrug, getDrugs, updateDrug } from '../controllers/drugController';
 
 
-router.post('/drugs',authenticate, authorize([UserRole.ADMIN]), createDrug);   // Create
-router.get('/drugs',authenticate, authorize([UserRole.ADMIN]), getDrugs);      // Read
-router.put('/drugs/:id',authenticate, authorize([UserRole.ADMIN]), updateDrug); // Update
-router.delete('/drugs/:id',authenticate, authorize([UserRole.ADMIN]), deleteDrug); // Delete
+router.post('/drugs',authenticate, authorize([UserRole.admin]), createDrug);   // Create
+router.get('/drugs',authenticate, authorize([UserRole.admin]), getDrugs);      // Read
+router.put('/drugs/:id',authenticate, authorize([UserRole.admin]), updateDrug); // Update
+router.delete('/drugs/:id',authenticate, authorize([UserRole.admin]), deleteDrug); // Delete
 
 export default router;

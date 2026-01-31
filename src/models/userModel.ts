@@ -1,12 +1,18 @@
 import { Schema, model, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+// export enum UserRole {
+//   ADMIN = 'ADMIN',
+//   MECHANIC = 'MECHANIC',
+//   CLERK = 'CLERK'
+// }
 export enum UserRole {
-  ADMIN = 'ADMIN',
-  MECHANIC = 'MECHANIC',
-  CLERK = 'CLERK'
+  admin = 'admin',
+  doctor = 'doctor',
+  nurse = 'nurse',
+  receptionist = 'receptionist'
 }
-
+// = 'admin' | 'doctor' | 'nurse' | 'receptionist';
 export interface IUser extends Document {
   name: string;
   phone_number: string;
@@ -37,7 +43,7 @@ const UserSchema = new Schema<IUser>({
     type: String,
 
   },
-  role: { type: String, enum: Object.values(UserRole), default: UserRole.MECHANIC },
+  role: { type: String, enum: Object.values(UserRole), default: UserRole.nurse },
   deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 

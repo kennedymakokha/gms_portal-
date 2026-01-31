@@ -25,7 +25,7 @@ export const getLabs = async (req: AuthRequest, res: Response) => {
 
 export const createlab = async (req: AuthRequest, res: Response) => {
     try {
-        console.log(req.body)
+    
         const { testName, uuid, price } = req.body;
         const lab = await Labs.findOneAndUpdate(
             { uuid },

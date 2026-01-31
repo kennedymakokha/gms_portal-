@@ -6,11 +6,11 @@ import { UserRole } from '../models/userModel';
 import { deleteUser, login, register, syncUsers, updateUser } from '../controllers/authController';
 
 
-router.post('/auth/register', authenticate, authorize([UserRole.ADMIN]), register);   // Create
+router.post('/auth/register', authenticate, authorize([UserRole.admin]), register);   // Create
 router.post('/auth/login', login);      // Read
-router.put('/auth/:id', authenticate, authorize([UserRole.ADMIN]), updateUser); // Update
-router.delete('/auth/:id', authenticate, authorize([UserRole.ADMIN]), deleteUser); // Delete
-router.get('/auth', authenticate, authorize([UserRole.ADMIN]), syncUsers); // sync
+router.put('/auth/:id', authenticate, authorize([UserRole.admin]), updateUser); // Update
+router.delete('/auth/:id', authenticate, authorize([UserRole.admin]), deleteUser); // Delete
+router.get('/auth', authenticate, authorize([UserRole.admin]), syncUsers); // sync
 
 
 export default router;

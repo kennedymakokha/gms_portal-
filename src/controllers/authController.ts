@@ -21,7 +21,7 @@ export const login = async (req: Request, res: Response) => {
       res.status(405).json("Method Not Allowed")
       return
     };
-   
+       console.log(req.body)
     const { phone_number, password } = req.body;
     let phone = await Format_phone_number(phone_number); //format the phone number
 

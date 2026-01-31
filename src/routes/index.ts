@@ -20,13 +20,13 @@ router.post('/sync', authenticate, syncController.pushChanges);
 
 // Jobs
 // router.get('/jobs', authenticate, jobController.getJobs);
-// // router.post('/jobs', authenticate, authorize([UserRole.ADMIN, UserRole.CLERK]), jobController.createJob);
-// router.post('/jobs', authenticate, authorize([UserRole.ADMIN, UserRole.CLERK]), jobController.saveJobCard);
-// router.delete('/jobs/:id', authenticate, authorize([UserRole.ADMIN]), jobController.deleteJob);
+// // router.post('/jobs', authenticate, authorize([UserRole.admin, UserRole.CLERK]), jobController.createJob);
+// router.post('/jobs', authenticate, authorize([UserRole.admin, UserRole.CLERK]), jobController.saveJobCard);
+// router.delete('/jobs/:id', authenticate, authorize([UserRole.admin]), jobController.deleteJob);
 
 
 // Inventory
 router.get('/inventory', authenticate, inventoryController.getInventory);
-router.post('/inventory', authenticate, authorize([UserRole.ADMIN]), inventoryController.createItem);
+router.post('/inventory', authenticate, authorize([UserRole.admin]), inventoryController.createItem);
 
 export default router;

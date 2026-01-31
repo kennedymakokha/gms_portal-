@@ -5,9 +5,9 @@ import { UserRole } from '../models/userModel';
 import { createVisit, deletevisit, getvisits } from '../controllers/VisitController';
 
 
-router.post('/visits', authenticate, authorize([UserRole.ADMIN]), createVisit);   // Create
-router.get('/visits', authenticate, authorize([UserRole.ADMIN]), getvisits);      // Read
-// router.put('/visits/:id', authenticate, authorize([UserRole.ADMIN]), updatepatient); // Update
-router.delete('/visits/:id', authenticate, authorize([UserRole.ADMIN]), deletevisit); // Delete
+router.post('/visits', authenticate, authorize([UserRole.admin]), createVisit);   // Create
+router.get('/visits', authenticate, authorize([UserRole.admin]), getvisits);      // Read
+// router.put('/visits/:id', authenticate, authorize([UserRole.admin]), updatepatient); // Update
+router.delete('/visits/:id', authenticate, authorize([UserRole.admin]), deletevisit); // Delete
 
 export default router;

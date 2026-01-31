@@ -6,9 +6,9 @@ import { UserRole } from '../models/userModel';
 import { createProcedure, deleteProcedure, getProcedures, updateProcedure } from '../controllers/Procedure';
 
 
-router.post('/procedures', authenticate, authorize([UserRole.ADMIN]), createProcedure);   // Create
-router.get('/procedures', authenticate, authorize([UserRole.ADMIN]), getProcedures);      // Read
-router.put('/procedures/:id', authenticate, authorize([UserRole.ADMIN]), updateProcedure); // Update
-router.delete('/procedures/:id', authenticate, authorize([UserRole.ADMIN]), deleteProcedure); // Delete
+router.post('/procedures', authenticate, authorize([UserRole.admin]), createProcedure);   // Create
+router.get('/procedures', authenticate, authorize([UserRole.admin]), getProcedures);      // Read
+router.put('/procedures/:id', authenticate, authorize([UserRole.admin]), updateProcedure); // Update
+router.delete('/procedures/:id', authenticate, authorize([UserRole.admin]), deleteProcedure); // Delete
 
 export default router;
