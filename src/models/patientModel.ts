@@ -12,12 +12,15 @@ export interface IPatient {
   nokName?: string;
   nokRelationship?: string;
   nokPhone?: string;
-
+  status?: "outpatient" | "admitted" | "critical" | "discharged";
+  bloodgroup?: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+  room?: string;
   history?: string;
-
+  assignedDoctor?: Types.ObjectId;
   created_by?: Types.ObjectId;
   clinic?: Types.ObjectId;
-
+  address?: string,
+  admissionDate: Date | null;
   isDeleted: boolean;
   deletedAt?: Date | null;
 }
@@ -36,7 +39,24 @@ const PatientSchema = new Schema<IPatient>(
       required: true,
       trim: true,
     },
+    bloodgroup: {
+      type: String,
+      enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O-', 'O+'],
+    },
+    room: {
+      type: String,
 
+    },
+    admissionDate: {
+      type: Date,
+      default: null,
+    },
+    status: {
+      type: String,
+      enum: ["outpatient", "admitted", "critical", "discharged"],
+      required: true,
+      default: 'outpatient'
+    },
     dob: {
       type: String,
       required: true,
@@ -48,18 +68,21 @@ const PatientSchema = new Schema<IPatient>(
       required: true,
     },
 
-    phone: String,
-    nationalId: String,
-
-    nokName: String,
-    nokRelationship: String,
-    nokPhone: String,
-
-    history: String,
-
+    phone: { type: String },
+    nationalId: { type: String },
+    nokName: { type: String },
+    nokRelationship: { type: String },
+    nokPhone: { type: String },
+    history: { type: String },
+    address: { type: String },
     created_by: {
       type: Schema.Types.ObjectId,
       ref: 'User',
+    },
+    assignedDoctor: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
     },
 
     clinic: {
@@ -78,9 +101,15 @@ const PatientSchema = new Schema<IPatient>(
       type: Date,
       default: null,
     },
+
   },
   {
     timestamps: true, // createdAt & updatedAt
   }
 );
+
+PatientSchema.index({
+  name: 'text',
+  phone: 'text',
+});
 export default model<IPatient>('Patient', PatientSchema);

@@ -44,19 +44,53 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
 // ----------------------
 // Get Jobs
 // ----------------------
+// export const getvisits = async (req: AuthRequest, res: Response) => {
+//   try {
+
+//     const visits = await Visits.find({ clinic: req.user?.clinicId }).populate('patientMongoose', 'name uuid')
+//     .populate('created_by', 'name uuid');
+//     res.json(visits);
+//   } catch (error: any) {
+//     console.error(' Error fetching visits:', error);
+//     res.status(500).json({ message: error.message });
+//   }
+// };
 export const getvisits = async (req: AuthRequest, res: Response) => {
   try {
+    // 1. Extract Pagination Parameters
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    const visits = await Visits.find({   clinic: req.user?.clinicId });
+    const filter = { clinic: req.user?.clinicId };
 
+    // 2. Execute Count and Fetch in Parallel
+    const [visits, total] = await Promise.all([
+      Visits.find(filter)
+        .populate('patientMongoose', 'name uuid')
+        .populate('created_by', 'name uuid')
+        .sort({ createdAt: -1 }) // Show newest visits first
+        .skip(skip)
+        .limit(limit)
+        .lean(), // lean() makes the query faster by returning plain JS objects
+      Visits.countDocuments(filter),
+    ]);
 
-    res.json(visits);
+    // 3. Return Paginated Response
+    res.status(200).json({
+      data: visits,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error: any) {
-    console.error(' Error fetching visits:', error);
+    console.error('Error fetching visits:', error);
     res.status(500).json({ message: error.message });
   }
 };
-
 // ----------------------
 // Create visit
 // ----------------------

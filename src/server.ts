@@ -12,6 +12,7 @@ import ClinicRoutes from './routes/clinic';
 import PatientRoutes from './routes/patient';
 import VisitRoutes from './routes/visit';
 import Drugroutes from './routes/drugs';
+import Bedroutes from './routes/beds';
 import Labroutes from './routes/labs';
 import procedureroutes from './routes/procedure';
 import patientHisory from './routes/patientHistory';
@@ -45,6 +46,7 @@ app.use('/api', patientHisory);
 app.use('/api', patientLabResults);
 app.use('/api', patientProcedures);
 app.use('/api', patientMedications);
+app.use('/api', Bedroutes);
 
 
 // Start

@@ -28,9 +28,15 @@ export const createpatient = async (req: AuthRequest, res: Response) => {
       phone,
       nationalId,
       nokName,
+      bloodgroup,
+      room,
+      status,
       nokRelationship,
+      assignedDoctor,
       nokPhone,
       history,
+      address,
+      admissionDate,
       isDeleted = false,
     } = req.body;
 
@@ -50,12 +56,18 @@ export const createpatient = async (req: AuthRequest, res: Response) => {
         dob,
         sex,
         phone,
+        bloodgroup,
+        room,
+        status,
         nationalId,
         nokName,
         nokRelationship,
+        assignedDoctor,
         nokPhone,
         history,
         isDeleted,
+        address,
+        admissionDate,
         clinic: req.user?.clinicId,
         updatedAt: new Date(),
       },
@@ -91,21 +103,74 @@ export const createpatient = async (req: AuthRequest, res: Response) => {
   }
 };
 
-
-
 export const getpatients = async (req: AuthRequest, res: Response) => {
   try {
-    const patients = await Patient.find({
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const search = (req.query.search as string)?.trim();
+
+    const skip = (page - 1) * limit;
+
+    const filter: any = {
       clinic: req.user?.clinicId,
       deletedAt: null,
       $or: [{ isDeleted: false }, { isDeleted: null }],
-    });
+    };
 
-    res.json(patients);
+    // 🔍 HYBRID SEARCH (name + phone)
+    if (search) {
+      filter.$and = [
+        {
+          $or: [
+            { name: { $regex: search, $options: 'i' } },
+            { phone: { $regex: search, $options: 'i' } },
+            { nationalId: { $regex: search, $options: 'i' } },
+          ],
+        },
+      ];
+    }
+
+    const [patients, total] = await Promise.all([
+      Patient.find(filter)
+        .sort({ createdAt: -1 }) // latest first
+        .skip(skip)
+        .limit(limit).populate('assignedDoctor', 'name'),
+      Patient.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      data: patients,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error: any) {
+    console.error('Get patients error:', error);
     res.status(500).json({ message: error.message });
   }
 };
+
+export const getPatientsOverview = async (req: AuthRequest, res: Response) => {
+  try {
+    const clinicId = req.user?.clinicId;
+
+    const result = await Patient.find({
+      clinic: clinicId,
+      deletedAt: null,
+      $or: [{ isDeleted: false }, { isDeleted: null }],
+    }).select('name status assignedDoctor uuid')
+
+
+
+    res.json({ patients: result });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 
 
 

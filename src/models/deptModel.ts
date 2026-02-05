@@ -3,6 +3,7 @@ import { Schema, model, Document } from 'mongoose';
 export interface IDepartment extends Document {
   name: string;
   description?: string;
+  head: Schema.Types.ObjectId,
   uuid: string;
   clinic?: string;
   created_by?: Schema.Types.ObjectId;
@@ -14,6 +15,7 @@ const DepartmentSchema = new Schema<IDepartment>({
   name: { type: String, required: true, unique: true },
   clinic: { type: String },
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  head: { type: Schema.Types.ObjectId, ref: 'User' },
   uuid: { type: String, unique: true },
   description: { type: String },
 

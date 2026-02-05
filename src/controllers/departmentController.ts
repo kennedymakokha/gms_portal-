@@ -4,7 +4,7 @@ import Department from '../models/deptModel';
 
 export const getDepartments = async (req: AuthRequest, res: Response) => {
   try {
-    const depts = await Department.find({ deletedAt: null, isDeleted: false });
+    const depts = await Department.find({ deletedAt: null, isDeleted: false, clinic: req.user?.clinicId });
     res.json(depts);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -14,21 +14,26 @@ export const getDepartments = async (req: AuthRequest, res: Response) => {
 export const createDepartment = async (req: AuthRequest, res: Response) => {
   try {
     const { uuid, name, code, description } = req.body;
+    const dept = await Department.findOneAndUpdate(
+      { uuid },
+      {
+        $set: {
+          name,
+          description,
+          clinic: req.user?.clinicId,
+          isDeleted: req.body.isDeleted ?? false,
+          updated_at: new Date(),
+        },
+        $setOnInsert: {
+          created_by: req.user?.id,
+          created_at: new Date(),
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+      })
 
-    // check by uuid first, fallback to name
-    const existing = await Department.findOne({ $or: [{ uuid }, { name }] });
-    if (existing) {
-      return res.status(200).json(existing); // already exists, return it
-    }
-
-    const dept = new Department({
-      uuid,
-      name,
-      description,
-      created_by: req.user?.id
-    });
-
-    await dept.save();
     res.status(201).json(dept);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -52,15 +57,15 @@ export const updateDepartment = async (req: AuthRequest, res: Response) => {
 // DELETE
 export const harddeleteDepartment = async (req: AuthRequest, res: Response) => {
   try {
- 
+
 
     const { id } = req.params; // or uuid — whichever you chose
-    
+
 
     const dept = await Department.findOneAndDelete({ uuid: id });
 
     if (!dept) {
-     
+
       return res.status(404).json({ error: 'Department not found' });
     }
 

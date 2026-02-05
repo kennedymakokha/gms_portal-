@@ -6,6 +6,16 @@ import bcrypt from 'bcryptjs';
 //   MECHANIC = 'MECHANIC',
 //   CLERK = 'CLERK'
 // }
+// name: string;
+// email: string;
+// phone: string;
+// specialty: string;
+// department: string;
+// status: 'active' | 'on-leave' | 'inactive';
+// experience: number;
+// qualification: string;
+// avatar ?: string;
+// schedule ?: string;
 export enum UserRole {
   admin = 'admin',
   doctor = 'doctor',
@@ -19,9 +29,16 @@ export interface IUser extends Document {
   password: string;
   role: UserRole;
   uuid: string
-  department?: string;
+  department?: Schema.Types.ObjectId;
   createdBy?: Schema.Types.ObjectId;
   clinic?: Schema.Types.ObjectId;
+  email?: string;
+  specialty: string;
+  status: 'active' | 'on-leave' | 'inactive';
+  experience: number;
+  qualification: string;
+  avatar?: string;
+  schedule?: string;
   isDeleted: boolean;
   deletedAt?: Date | null;
   comparePassword(candidate: string): Promise<boolean>;
@@ -31,6 +48,12 @@ const UserSchema = new Schema<IUser>({
   name: { type: String, required: true },
   phone_number: { type: String, required: true, },
   password: { type: String, required: true },
+  email: { type: String },
+  experience: { type: Number },
+  qualification: { type: String },
+  avatar: { type: String },
+  schedule: { type: String },
+  status: { type: String },
   uuid: { type: String, unique: true },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
   clinic: { type: Schema.Types.ObjectId, ref: 'clinic' },
@@ -39,10 +62,8 @@ const UserSchema = new Schema<IUser>({
     default: false,
     index: true,
   },
-  department: {
-    type: String,
-
-  },
+  department
+    : { type: Schema.Types.ObjectId, ref: 'Department' },
   role: { type: String, enum: Object.values(UserRole), default: UserRole.nurse },
   deletedAt: { type: Date, default: null }
 }, { timestamps: true });

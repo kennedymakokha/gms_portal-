@@ -6,6 +6,7 @@ import { Schema, model } from 'mongoose';
 export interface IVisits {
   uuid: string;          // unique identifier for the visit
   patientId: string;   // reference to the patient (as string)
+  patientMongoose: Schema.Types.ObjectId;   // reference to the patient (as string)
   notes: string;         // optional notes about the visit
   clinic: string;        // reference to the clinic (as string)
   disposition: string;   // disposition of the visit
@@ -17,11 +18,11 @@ export interface IVisits {
   temperature: string;   // temperature
   pulse: string;         // pulse rate
   respiratoryRate: string; // respiratory rate
-  triageCategory: string; // triage category
+  // triage category
   weight: string;        // weight of the patient
   height: string;        // height of the patient
   bmi: string;           // body mass index of the patient
-
+  created_by: Schema.Types.ObjectId;
   visitDate: Date | null;
   deletedAt?: Date | null;
   createdAt?: Date;      // automatically added by timestamps
@@ -41,6 +42,9 @@ const visitSchema = new Schema<IVisits>(
       type: String,
       default: '',
     },
+    patientMongoose: { type: Schema.Types.ObjectId, ref: 'Patient' },
+    created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+
     totalAmount: {
       type: Number,
       required: true,
