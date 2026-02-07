@@ -1,12 +1,11 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface IBed extends Document {
+export interface IWard extends Document {
 
   uuid: string;
   clinic: string;
-  bedNumber: string;
-  bedSeq: number;
-  ward: Schema.Types.ObjectId;
+  wardName: string;
+  gender: 'male' | 'female' | 'other' ;
   type: 'general' | 'icu' | 'private' | 'semi-private';
   status: 'available' | 'occupied' | 'maintenance' | 'reserved';
   created_by?: Schema.Types.ObjectId;
@@ -15,10 +14,10 @@ export interface IBed extends Document {
 }
 
 
-const BedSchema = new Schema<IBed>({
-  bedNumber: { type: String },
-  ward: { type: Schema.Types.ObjectId, ref: 'Wards' },
-  type: { type: String, default: "general" },
+const WardSchema = new Schema<IWard>({
+  wardName: { type: String },
+  gender: { type: String, default: "female" },
+  type:{type:String,default:'general'},
   status: { type: String, default: "available" },
   clinic: { type: String },
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
@@ -32,5 +31,5 @@ const BedSchema = new Schema<IBed>({
   deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
-export default model<IBed>('Beds', BedSchema);
+export default model<IWard>('Wards', WardSchema);
 

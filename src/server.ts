@@ -19,6 +19,7 @@ import patientHisory from './routes/patientHistory';
 import patientLabResults from './routes/patientLabResults';
 import patientProcedures from './routes/patientProcedures';
 import patientMedications from './routes/patientMedication';
+import wardsRoute from './routes/wards';
 dotenv.config();
 
 const app = express();
@@ -47,6 +48,7 @@ app.use('/api', patientLabResults);
 app.use('/api', patientProcedures);
 app.use('/api', patientMedications);
 app.use('/api', Bedroutes);
+app.use('/api', wardsRoute);
 
 
 // Start
