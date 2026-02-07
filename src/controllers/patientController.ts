@@ -108,6 +108,15 @@ export const getpatients = async (req: AuthRequest, res: Response) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const search = (req.query.search as string)?.trim();
+    
+    const rawStatus = req.query.status as string;
+
+    const status =
+      rawStatus &&
+        rawStatus !== 'undefined' &&
+        rawStatus !== 'null'
+        ? rawStatus
+        : undefined;
 
     const skip = (page - 1) * limit;
 
@@ -117,7 +126,7 @@ export const getpatients = async (req: AuthRequest, res: Response) => {
       $or: [{ isDeleted: false }, { isDeleted: null }],
     };
 
-    // 🔍 HYBRID SEARCH (name + phone)
+    // 🔍 Search by name / phone / nationalId
     if (search) {
       filter.$and = [
         {
@@ -130,11 +139,17 @@ export const getpatients = async (req: AuthRequest, res: Response) => {
       ];
     }
 
+    // ✅ Status filter ONLY if provided
+    if (status) {
+      filter.status = status;
+    }
+
     const [patients, total] = await Promise.all([
       Patient.find(filter)
-        .sort({ createdAt: -1 }) // latest first
+        .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit).populate('assignedDoctor', 'name'),
+        .limit(limit)
+        .populate('assignedDoctor', 'name'),
       Patient.countDocuments(filter),
     ]);
 
@@ -152,6 +167,7 @@ export const getpatients = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 export const getPatientsOverview = async (req: AuthRequest, res: Response) => {
   try {
