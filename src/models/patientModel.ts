@@ -16,13 +16,15 @@ export interface IPatient {
   bloodgroup?: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
   room?: string;
   history?: string;
-  assignedDoctor?: Types.ObjectId;
+
+  track: 'registered' | 'reg_billing' | 'lab' | 'lab_billing' | 'med_billing' | 'ward_billing' | 'triage' | 'pre-lab' | 'post-lab' | 'pharmecy' | 'admitted';
   created_by?: Types.ObjectId;
   clinic?: Types.ObjectId;
   address?: string,
   admissionDate: Date | null;
   isDeleted: boolean;
   deletedAt?: Date | null;
+  visits?: Types.ObjectId[];
 }
 
 const PatientSchema = new Schema<IPatient>(
@@ -47,10 +49,19 @@ const PatientSchema = new Schema<IPatient>(
       type: String,
 
     },
+    track: { type: String, default: 'reg_billing' },
     admissionDate: {
       type: Date,
       default: null,
     },
+    visits: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Visits',
+      },
+    ],
+
+
     status: {
       type: String,
       enum: ["outpatient", "admitted", "critical", "discharged"],
@@ -79,11 +90,7 @@ const PatientSchema = new Schema<IPatient>(
       type: Schema.Types.ObjectId,
       ref: 'User',
     },
-    assignedDoctor: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      index: true,
-    },
+
 
     clinic: {
       type: Schema.Types.ObjectId,

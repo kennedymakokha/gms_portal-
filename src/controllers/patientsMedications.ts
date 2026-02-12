@@ -3,14 +3,52 @@ import { AuthRequest } from '../middleware/auth';
 import Medications from '../models/patientmedicationsModel';
 
 
+import { getPagination } from '../utils/pagination';
+import { parseQueryParam } from '../utils/queryParser';
+import { buildMedicationFilter } from './filters/medicationFilters';
+
+
 export const getMedications = async (req: AuthRequest, res: Response) => {
   try {
-    const depts = await Medications.find({ deletedAt: null, isDeleted: false, });
-    res.json(depts);
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
+
+    const search = parseQueryParam(req.query.search as string);
+    const status = parseQueryParam(req.query.status as string);
+
+    const filter = buildMedicationFilter({
+      clinicId: req.user?.clinicId,
+      search,
+      status,
+    });
+
+    const [medications, total] = await Promise.all([
+      Medications.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
+      Medications.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      data: medications,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error: any) {
+    console.error('Error fetching medications:', error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 
 export const createMedications = async (req: AuthRequest, res: Response) => {

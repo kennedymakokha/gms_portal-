@@ -5,6 +5,7 @@ export interface IDepartment extends Document {
   description?: string;
   head: Schema.Types.ObjectId,
   uuid: string;
+  fee: number
   clinic?: string;
   created_by?: Schema.Types.ObjectId;
   deletedAt?: Date | null;
@@ -18,7 +19,7 @@ const DepartmentSchema = new Schema<IDepartment>({
   head: { type: Schema.Types.ObjectId, ref: 'User' },
   uuid: { type: String, unique: true },
   description: { type: String },
-
+  fee: { type: Number, default: 500 },
   isDeleted: {
     type: Boolean,
     default: false,

@@ -3,50 +3,36 @@ import { AuthRequest } from '../middleware/auth';
 import Bed from '../models/bedsModel';
 import Ward from '../models/wardModel';
 
+import { getPagination } from '../utils/pagination';
+import { parseQueryParam } from '../utils/queryParser';
+import { buildBedFilter } from './filters/bedFilters';
+
 export const getBeds = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user?.clinicId) {
       return res.status(400).json({ message: 'Clinic ID missing in token' });
     }
 
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const search = (req.query.search as string)?.trim();
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
 
-    const statusFilter =
-      req.user?.role === "admin"
-        ? { $in: ['available', 'occupied', 'maintenance', 'reserved'] }
-        : { $in: ['available', 'reserved'] };
+    const search = parseQueryParam(req.query.search as string);
 
-    const skip = (page - 1) * limit;
-
-    const filter: any = {
-      clinic: req.user?.clinicId,
-      status: statusFilter,
-      deletedAt: null,
-      $or: [{ isDeleted: false }, { isDeleted: null }],
-    };
-
-    // 🔍 Search by name / phone / nationalId
-    if (search) {
-      filter.$and = [
-        {
-          $or: [
-            { bedNumber: { $regex: search, $options: 'i' } },
-            { word: { $regex: search, $options: 'i' } },
-
-          ],
-        },
-      ];
-    }
-
+    const filter = buildBedFilter({
+      clinicId: req.user.clinicId,
+      role: req.user.role,
+      search,
+    });
 
     const [beds, total] = await Promise.all([
       Bed.find(filter)
+        .populate('ward')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('ward'),
+        .lean(),
 
       Bed.countDocuments(filter),
     ]);
@@ -60,13 +46,12 @@ export const getBeds = async (req: AuthRequest, res: Response) => {
         totalPages: Math.ceil(total / limit),
       },
     });
-    ;
-
   } catch (error: any) {
-    console.log(error);
+    console.error('Error fetching beds:', error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 export const getBedOverview = async (req: AuthRequest, res: Response) => {
   try {

@@ -2,52 +2,38 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import Procedures from '../models/ProcedureModel';
 
-import { Types } from "mongoose";
+import { getPagination } from '../utils/pagination';
+import { parseQueryParam } from '../utils/queryParser';
+import { buildProcedureFilter } from './filters/procedureFilters';
+
 
 export const getProcedures = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user?.clinicId) {
-      return res.status(400).json({ message: 'Clinic ID missing in token' });
+      return res.status(400).json({ message: "Clinic ID missing in token" });
     }
 
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const search = (req.query.search as string)?.trim();
-    const statusFilter =
-      req.user?.role === "admin"
-        ? { $in: ["active", "inactive"] }
-        : "active";
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
 
-    const skip = (page - 1) * limit;
+    const search = parseQueryParam(req.query.search as string);
+    const status = parseQueryParam(req.query.status as string);
 
-    const filter: any = {
-      clinic: req.user?.clinicId,
-      deletedAt: null,
-      status:statusFilter,
-      $or: [{ isDeleted: false }, { isDeleted: null }],
-    };
-
-    // 🔍 Search by name / phone / nationalId
-    if (search) {
-      filter.$and = [
-        {
-          $or: [
-            { procedureName: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
-
-          ],
-        },
-      ];
-    }
-
-    // ✅ Status filter ONLY if provided
-   
+    const filter = buildProcedureFilter({
+      clinicId: req.user.clinicId,
+      role: req.user.role,
+      search,
+      status,
+    });
 
     const [procedures, total] = await Promise.all([
       Procedures.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
 
       Procedures.countDocuments(filter),
     ]);
@@ -61,13 +47,12 @@ export const getProcedures = async (req: AuthRequest, res: Response) => {
         totalPages: Math.ceil(total / limit),
       },
     });
-    ;
-
   } catch (error: any) {
-    console.log(error);
+    console.error("Error fetching procedures:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 
 export const createProcedure = async (req: AuthRequest, res: Response) => {

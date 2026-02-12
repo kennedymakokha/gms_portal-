@@ -4,6 +4,10 @@ import mongoose from 'mongoose';
 import Job, { IJob } from '../models/jobModel';
 import Customer from '../models/customerModel';
 import Vehicle from '../models/vehicleModel';
+// ----------------------
+import { getPagination } from '../utils/pagination';
+import { parseQueryParam } from '../utils/queryParser';
+import { buildJobFilter } from './filters/jobFilters';
 
 // ----------------------
 // DTO / Typed interfaces
@@ -110,24 +114,55 @@ export const saveJobCard = async (req: AuthRequest, res: Response) => {
 
 // ----------------------
 // Get Jobs
-// ----------------------
+
+
 export const getJobs = async (req: AuthRequest, res: Response) => {
   try {
-    const jobs = await Job.find({ deletedAt: null })
-      .populate('department', 'name code')
-      .populate({
-        path: 'assignedTo',
-        select: 'name email role department',
-        populate: { path: 'department', select: 'name code' }
-      })
-      .lean();
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
 
-    res.json(jobs);
+    const search = parseQueryParam(req.query.search as string);
+    const status = parseQueryParam(req.query.status as string);
+
+    const filter = buildJobFilter({
+      clinicId: req.user?.clinicId,
+      search,
+      status,
+    });
+
+    const [jobs, total] = await Promise.all([
+      Job.find(filter)
+        .populate('department', 'name code')
+        .populate({
+          path: 'assignedTo',
+          select: 'name email role department',
+          populate: { path: 'department', select: 'name code' },
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
+      Job.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      data: jobs,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error: any) {
-    console.error(' Error fetching jobs:', error);
+    console.error('Error fetching jobs:', error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // ----------------------
 // Create Job

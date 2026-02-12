@@ -3,11 +3,48 @@ import { AuthRequest } from '../middleware/auth';
 import History from '../models/patientHistoryModel';
 
 
+import { getPagination } from '../utils/pagination';
+import { parseQueryParam } from '../utils/queryParser';
+import { buildHistoryFilter } from './filters/historyFilters';
+
+
 export const getHistory = async (req: AuthRequest, res: Response) => {
   try {
-    const depts = await History.find({ deletedAt: null, isDeleted: false, });
-    res.json(depts);
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
+
+    const search = parseQueryParam(req.query.search as string);
+    const status = parseQueryParam(req.query.status as string);
+
+    const filter = buildHistoryFilter({
+      clinicId: req.user?.clinicId,
+      search,
+      status,
+    });
+
+    const [history, total] = await Promise.all([
+      History.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
+      History.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      data: history,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error: any) {
+    console.error('Error fetching history:', error);
     res.status(500).json({ message: error.message });
   }
 };

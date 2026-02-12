@@ -2,6 +2,10 @@ import mongoose from 'mongoose';
 import { Response } from 'express';
 import Labs, { ILab } from '../models/labModel';
 import { AuthRequest } from '../middleware/auth';
+import { getPagination } from '../utils/pagination';
+import { parseQueryParam } from '../utils/queryParser';
+import { buildLabTestFilter } from './filters/labTestFilters';
+
 
 export const getLabs = async (req: AuthRequest, res: Response) => {
   try {
@@ -9,43 +13,27 @@ export const getLabs = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Clinic ID missing in token' });
     }
 
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const search = (req.query.search as string)?.trim();
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
 
-    const statusFilter =
-      req.user?.role === "admin"
-        ? { $in: ["active", "inactive"] }
-        : "active";
+    const search = parseQueryParam(req.query.search as string);
+    const status = parseQueryParam(req.query.status as string);
 
-    const skip = (page - 1) * limit;
-
-    const filter: any = {
-      clinic: req.user?.clinicId,
-      status:statusFilter,
-      deletedAt: null,
-      $or: [{ isDeleted: false }, { isDeleted: null }],
-    };
-
-    // 🔍 Search by name / phone / nationalId
-    if (search) {
-      filter.$and = [
-        {
-          $or: [
-            { testName: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
-
-          ],
-        },
-      ];
-    }
-  
+    const filter = buildLabTestFilter({
+      clinicId: req.user.clinicId,
+      role: req.user.role,
+      search,
+      status,
+    });
 
     const [labs, total] = await Promise.all([
       Labs.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
 
       Labs.countDocuments(filter),
     ]);
@@ -59,10 +47,8 @@ export const getLabs = async (req: AuthRequest, res: Response) => {
         totalPages: Math.ceil(total / limit),
       },
     });
-    ;
-
   } catch (error: any) {
-    console.log(error);
+    console.error('Error fetching labs:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -111,17 +97,17 @@ export const getLabOverview = async (req: AuthRequest, res: Response) => {
   try {
     const clinicId = req.user?.clinicId;
 
-    const statusFilter =
-      req.user?.role === "admin"
-        ? { $in: ["active", "inactive"] }
-        : "active";
+    // const statusFilter =
+    //   req.user?.role === "admin"
+    //     ? { $in: ["active", "inactive"] }
+    //     : "active";
 
     const result = await Labs.find({
-      clinic: clinicId,
-      status: statusFilter,
+      // clinic: clinicId,
+      // status: statusFilter,
       deletedAt: null,
       $or: [{ isDeleted: false }, { isDeleted: null }],
-    }).select("labTest status uuid");
+    }).select("testName status uuid price");
 
     res.json({ data: result });
   } catch (err: any) {

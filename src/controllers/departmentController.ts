@@ -1,12 +1,46 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import Department from '../models/deptModel';
+import { getPagination } from '../utils/pagination';
+import { parseQueryParam } from '../utils/queryParser';
+import { buildDepartmentFilter } from './filters/departmentFilters';
+
 
 export const getDepartments = async (req: AuthRequest, res: Response) => {
   try {
-    const depts = await Department.find({ deletedAt: null, isDeleted: false, clinic: req.user?.clinicId });
-    res.json(depts);
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
+
+    const search = parseQueryParam(req.query.search as string);
+
+    const filter = buildDepartmentFilter({
+      clinicId: req.user?.clinicId,
+      search,
+    });
+
+    const [departments, total] = await Promise.all([
+      Department.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
+      Department.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      data: departments,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error: any) {
+    console.error('Error fetching departments:', error);
     res.status(500).json({ message: error.message });
   }
 };

@@ -1,4 +1,4 @@
-import { Schema, model } from 'mongoose';
+import mongoose, { Schema, model } from 'mongoose';
 
 // TypeScript interface for Visit document
 
@@ -13,8 +13,10 @@ export interface IVisits {
   diagnosis: string;     // diagnosis of the visit
   labOrders: string;     // lab orders for the visit
   pharmacyInstructions: string; // pharmacy instructions for the visit
+  track: 'registered' | 'reg_billing' | 'lab_billing' | 'med_billing' | 'ward_billing' | 'triage' | 'pre-lab' | 'post-lab' | 'lab' | 'pharmecy' | 'admitted';
   bp: string;            // blood pressure
-  totalAmount: number;  // total amount billed for the visit
+  totalAmount: number;
+  consultationFee: number;  // total amount billed for the visit
   temperature: string;   // temperature
   pulse: string;         // pulse rate
   respiratoryRate: string; // respiratory rate
@@ -23,11 +25,25 @@ export interface IVisits {
   height: string;        // height of the patient
   bmi: string;           // body mass index of the patient
   created_by: Schema.Types.ObjectId;
+
+  vitalsNurseId: Schema.Types.ObjectId;
+  assignedDoctor?: Schema.Types.ObjectId;
   visitDate: Date | null;
   deletedAt?: Date | null;
   createdAt?: Date;      // automatically added by timestamps
   updatedAt?: Date;      // automatically added by timestamps
+  chiefComplaint: string;
+  symptoms: string[];
+  totallabTestFee: number;
+  prescribedTests: string[];
+  testResults?: Record<string, string>;
+  prescribedProcedures: string[];
+  medications?: string[];
+  oxygenSaturation?: string
+
 }
+
+
 
 // Mongoose schema
 const visitSchema = new Schema<IVisits>(
@@ -44,15 +60,36 @@ const visitSchema = new Schema<IVisits>(
     },
     patientMongoose: { type: Schema.Types.ObjectId, ref: 'Patient' },
     created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  
+    vitalsNurseId: { type: Schema.Types.ObjectId, ref: 'User' },
 
+    track: { type: String, default: 'registered' },
+    assignedDoctor: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
     totalAmount: {
       type: Number,
-      required: true,
+
+      default: 0,
+    },
+    oxygenSaturation: {
+      type: String,
+    },
+    totallabTestFee: {
+      type: Number,
+
+      default: 0,
+    },
+    consultationFee: {
+      type: Number,
+
       default: 0,
     },
     patientId: {
       type: String,
-      required: true,
+
       index: true,
     },
     notes: {
@@ -75,6 +112,36 @@ const visitSchema = new Schema<IVisits>(
       type: String,
       default: '',
     },
+    chiefComplaint: {
+      type: String,
+      default: '',
+    },
+    symptoms: [
+      {
+        type: String,
+        default: '',
+      }
+    ],
+    prescribedTests: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'labs',
+      },
+    ],
+
+    // testResults?: Record<string, string>;
+    prescribedProcedures: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'procedure',
+      },
+    ],
+    medications: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'procedure',
+      },
+    ],
     labOrders: {
       type: String,
       default: '',
@@ -100,5 +167,8 @@ const visitSchema = new Schema<IVisits>(
 );
 
 // Model
-const Visits = model<IVisits>('Visits', visitSchema);
+const Visits =
+  mongoose.models.Visits ||
+  mongoose.model<IVisits>("Visits", visitSchema);
+
 export default Visits;

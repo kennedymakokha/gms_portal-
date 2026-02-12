@@ -1,7 +1,12 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 
+import { getPagination } from '../utils/pagination';
+import { parseQueryParam } from '../utils/queryParser';
+
+
 import Clinic from '../models/clinicModel';
+import { buildClinicFilter } from './filters/clinicFilters';
 
 
 
@@ -34,10 +39,36 @@ export const saveclinic = async (req: AuthRequest, res: Response) => {
 
 export const getclinics = async (req: AuthRequest, res: Response) => {
   try {
-    const clinics = await Clinic.find({ deletedAt: null, isDeleted: false});
-    res.json(clinics);
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
+
+    const search = parseQueryParam(req.query.search as string);
+
+    const filter = buildClinicFilter({ search });
+
+    const [clinics, total] = await Promise.all([
+      Clinic.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
+      Clinic.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      data: clinics,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error: any) {
-    console.error(' Error fetching clinics:', error);
+    console.error('Error fetching clinics:', error);
     res.status(500).json({ message: error.message });
   }
 };

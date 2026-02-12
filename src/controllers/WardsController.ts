@@ -3,48 +3,46 @@ import { AuthRequest } from '../middleware/auth';
 import Ward from '../models/wardModel';
 
 
+import { getPagination } from '../utils/pagination';
+import { parseQueryParam } from '../utils/queryParser';
+import { buildWardFilter } from './filters/wardFilters';
+
+
+
+// const parseQueryParam = (param: any): string | undefined => {
+//   if (!param) return undefined;
+
+//   if (typeof param === 'string') return param;
+//   if (Array.isArray(param)) return param.join(','); // or pick the first element: param[0]
+//   return undefined; // for ParsedQs objects
+// };
 export const getWards = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user?.clinicId) {
-      return res.status(400).json({ message: 'Clinic ID missing in token' });
+      return res.status(400).json({ message: "Clinic ID missing in token" });
     }
 
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const search = (req.query.search as string)?.trim();
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
 
-    const statusFilter =
-      req.user?.role === "admin"
-        ? { $in: ['available', 'occupied', 'maintenance', 'reserved'] }
-        : { $in: ['available', 'reserved'] };
+    const search = parseQueryParam(req.query.search as string);
+    const status = parseQueryParam(req.query.status as string);
 
-    const skip = (page - 1) * limit;
-
-    const filter: any = {
-      clinic: req.user?.clinicId,
-      status: statusFilter,
-      deletedAt: null,
-      $or: [{ isDeleted: false }, { isDeleted: null }],
-    };
-
-    // 🔍 Search by name / phone / nationalId
-    if (search) {
-      filter.$and = [
-        {
-          $or: [
-            { wardName: { $regex: search, $options: 'i' } },
-            
-          ],
-        },
-      ];
-    }
-
+    const filter = buildWardFilter({
+      clinicId: req.user!.clinicId,
+      role: req.user!.role,
+      search,
+      status,
+    });
 
     const [wards, total] = await Promise.all([
       Ward.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
 
       Ward.countDocuments(filter),
     ]);
@@ -58,13 +56,12 @@ export const getWards = async (req: AuthRequest, res: Response) => {
         totalPages: Math.ceil(total / limit),
       },
     });
-    ;
-
   } catch (error: any) {
-    console.log(error);
+    console.error("Error fetching wards:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 export const getWardOverview = async (req: AuthRequest, res: Response) => {
   try {

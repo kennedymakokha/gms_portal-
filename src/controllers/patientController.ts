@@ -2,8 +2,13 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import Patient from '../models/patientModel';
 import Visits, { IVisits } from '../models/visitModel';
-import Clinic from '../models/clinicModel';
-import mongoose from 'mongoose';
+import Payment, { PaymentRecord } from '../models/paymentModal';
+import mongoose, { HydratedDocument } from 'mongoose';
+import User from '../models/userModel';
+import { getNextNumber, generateSmartAbbreviation } from '../utils/getNextNumber';
+import { getPagination } from '../utils/pagination';
+import { parseQueryParam } from '../utils/queryParser';
+import { buildPatientFilter } from './filters/patientFilters';
 
 
 
@@ -15,12 +20,15 @@ export const generateUnifiedId = (str: string) => {
   return `${str}_${timestamp}_${random}`;
 };
 
-export const createpatient = async (req: AuthRequest, res: Response) => {
+export const createPatient = async (req: AuthRequest, res: Response) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const {
+    const clinicId = req.user?.clinicId!;
+    const userId = req.user?.id!;
+
+    let {
       uuid,
       name,
       dob,
@@ -40,47 +48,52 @@ export const createpatient = async (req: AuthRequest, res: Response) => {
       isDeleted = false,
     } = req.body;
 
-    if (!uuid) {
-      return res.status(400).json({ message: 'Patient uuid is required' });
-    }
-
     if (!name || !dob || !sex) {
       return res.status(400).json({
-        message: 'name, dob and sex are required',
+        message: "name, dob and sex are required",
       });
     }
 
-    const update = {
-      $set: {
-        name,
-        dob,
-        sex,
-        phone,
-        bloodgroup,
-        room,
-        status,
-        nationalId,
-        nokName,
-        nokRelationship,
-        assignedDoctor,
-        nokPhone,
-        history,
-        isDeleted,
-        address,
-        admissionDate,
-        clinic: req.user?.clinicId,
-        updatedAt: new Date(),
-      },
-      $setOnInsert: {
-        uuid,
-        created_by: req.user?.id,
-        createdAt: new Date(),
-      },
-    };
+    // ✅ Generate Patient UUID safely
+    if (!uuid) {
+      uuid = await getNextNumber({
+        base: "ptnt",
+        clinicId,
+        session,
+      });
+    }
 
+    // ✅ Upsert Patient
     const patient = await Patient.findOneAndUpdate(
-      { uuid },          // 🔑 idempotency key
-      update,
+      { uuid },
+      {
+        $set: {
+          name,
+          dob,
+          sex,
+          phone,
+          bloodgroup,
+          room,
+          status,
+          nationalId,
+          nokName,
+          nokRelationship,
+          assignedDoctor,
+          nokPhone,
+          history,
+          isDeleted,
+          address,
+          admissionDate,
+          clinic: clinicId,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          uuid,
+          created_by: userId,
+          createdAt: new Date(),
+          visits: [],
+        },
+      },
       {
         upsert: true,
         new: true,
@@ -88,68 +101,116 @@ export const createpatient = async (req: AuthRequest, res: Response) => {
       }
     );
 
+    // ✅ Only create visit if new patient
+    if (patient.visits?.length === 0 && !isDeleted) {
+
+      const doctor = await User.findById(assignedDoctor)
+        .populate({ path: "department", select: "fee name" })
+        .session(session);
+
+      const departmentName =
+        (doctor?.department as any)?.name || undefined;
+
+      const consultationFee =
+        (doctor?.department as any)?.fee || 0;
+
+      // ✅ Visit UUID
+      const visitUuid = await getNextNumber({
+        base: "vst",
+        clinicId,
+        department: departmentName,
+        session,
+      });
+
+
+      const visit = await new Visits({
+        uuid: visitUuid,
+        patientId: patient.uuid,
+        patientMongoose: patient._id,
+        assignedDoctor,
+        clinic: clinicId,
+        created_by: userId,
+        track: "reg_billing",
+      }).save({ session });
+
+      // ✅ Payment UUID
+      const paymentUuid = await getNextNumber({
+        base: "pymnt",
+        clinicId,
+        department: `${generateSmartAbbreviation(departmentName)}/${generateSmartAbbreviation(req.body.status)}`,
+        session,
+      });
+
+      await new Payment({
+        uuid: paymentUuid,
+        patientId: patient._id,
+        clinic: clinicId,
+        consultationFee,
+        created_by: userId,
+        visitId: visit._id,
+      }).save({ session });
+
+      await Patient.findByIdAndUpdate(
+        patient._id,
+        { $push: { visits: visit._id } },
+        { session }
+      );
+    }
+
     await session.commitTransaction();
     session.endSession();
 
-    res.status(201).json({
-      message: isDeleted ? 'Patient deleted' : 'Patient saved',
+    return res.status(201).json({
+      message: isDeleted ? "Patient deleted" : "Patient saved",
       patient,
     });
+
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
-    console.error('Error saving patient:', error);
-    res.status(500).json({ error: error.message });
+    console.error("Error saving patient:", error);
+    return res.status(500).json({ error: error.message });
   }
 };
 
+
 export const getpatients = async (req: AuthRequest, res: Response) => {
   try {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const search = (req.query.search as string)?.trim();
-    
-    const rawStatus = req.query.status as string;
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
 
-    const status =
-      rawStatus &&
-        rawStatus !== 'undefined' &&
-        rawStatus !== 'null'
-        ? rawStatus
-        : undefined;
+    const search = parseQueryParam(req.query.search as string);
+    const status = parseQueryParam(req.query.status as string);
+    const track = parseQueryParam(req.query.track as string);
 
-    const skip = (page - 1) * limit;
-
-    const filter: any = {
-      clinic: req.user?.clinicId,
-      deletedAt: null,
-      $or: [{ isDeleted: false }, { isDeleted: null }],
-    };
-
-    // 🔍 Search by name / phone / nationalId
-    if (search) {
-      filter.$and = [
-        {
-          $or: [
-            { name: { $regex: search, $options: 'i' } },
-            { phone: { $regex: search, $options: 'i' } },
-            { nationalId: { $regex: search, $options: 'i' } },
-          ],
-        },
-      ];
-    }
-
-    // ✅ Status filter ONLY if provided
-    if (status) {
-      filter.status = status;
-    }
+    const filter = buildPatientFilter({
+      clinicId: req.user?.clinicId,
+      search,
+      status,
+      track,
+    });
 
     const [patients, total] = await Promise.all([
       Patient.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('assignedDoctor', 'name'),
+        .populate({
+          path: 'visits',
+          select: 'patientID assignedDoctor',
+          populate: {
+            path: 'assignedDoctor',
+            select: 'name department',
+            populate: {
+              path: 'department',
+              select: 'name fee',
+            },
+          },
+        })
+        .lean(), // 🚀 performance boost
+
       Patient.countDocuments(filter),
     ]);
 
@@ -167,6 +228,7 @@ export const getpatients = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 
 export const getPatientsOverview = async (req: AuthRequest, res: Response) => {
