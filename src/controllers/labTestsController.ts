@@ -5,6 +5,7 @@ import { AuthRequest } from '../middleware/auth';
 import { getPagination } from '../utils/pagination';
 import { parseQueryParam } from '../utils/queryParser';
 import { buildLabTestFilter } from './filters/labTestFilters';
+import { getNextNumber } from '../utils/getNextNumber';
 
 
 export const getLabs = async (req: AuthRequest, res: Response) => {
@@ -54,16 +55,41 @@ export const getLabs = async (req: AuthRequest, res: Response) => {
 };
 
 
-
 export const createlab = async (req: AuthRequest, res: Response) => {
-  try {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-    const { testName,
+  try {
+    if (!req.user?.clinicId || !req.user?.id) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const clinicId = req.user.clinicId;
+    const userId = req.user.id;
+
+    let {
+      testName,
       category,
       turnaroundTime,
-      requiresFasting, uuid, price, status } = req.body;
+      requiresFasting,
+      uuid,
+      price,
+      status,
+    } = req.body;
+
+    // Generate UUID inside transaction
+    if (!uuid) {
+      uuid = await getNextNumber({
+        base: "tst",
+        clinicId,
+        session, // 🔥 pass session here
+      });
+    }
+
     const lab = await Labs.findOneAndUpdate(
-      { uuid },
+      { uuid, clinic: clinicId },
       {
         $set: {
           testName,
@@ -72,26 +98,33 @@ export const createlab = async (req: AuthRequest, res: Response) => {
           turnaroundTime,
           requiresFasting,
           status,
-          clinic: req.user?.clinicId,
+          clinic: clinicId,
           isDeleted: req.body.isDeleted ?? false,
           updated_at: new Date(),
         },
         $setOnInsert: {
-          created_by: req.user?.id,
+          created_by: userId,
           created_at: new Date(),
         },
       },
       {
         upsert: true,
         new: true,
+        session, // 🔥 attach session here
       }
     );
-    res.status(201).json(lab);
 
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(201).json(lab);
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    await session.abortTransaction();
+    session.endSession();
+    return res.status(500).json({ message: error.message });
   }
 };
+
 
 export const getLabOverview = async (req: AuthRequest, res: Response) => {
   try {

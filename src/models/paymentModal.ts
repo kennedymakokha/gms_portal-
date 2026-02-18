@@ -17,8 +17,16 @@ export interface PaymentRecord extends Document {
     otherFeepaidAt: Date | null;
     boardingFeepaidAt: Date | null;
     medFeepaidAt: Date | null;
+    track: 'registered' | 'reg_billing' | 'lab' | 'lab_billing' | 'med_billing' | 'ward_billing' | 'triage' | 'pre-lab' | 'post-lab' | 'pharmecy' | 'admitted';
     method: "cash" | "card" | "insurance" | "mobile";
     status: "pending" | "paid" | "overdue" | "cancelled";
+
+    invoiceId: string;
+    patientName: string;
+    amount: number;
+
+    date: string;
+    reference?: string;
 
 }
 
@@ -30,18 +38,19 @@ const invoiceSchema = new Schema<PaymentRecord>({
     visitId: { type: Schema.Types.ObjectId, ref: 'Visits' },
     patientId: { type: Schema.Types.ObjectId, ref: 'Patient' },
     created_by: { type: Schema.Types.ObjectId, ref: 'User' },
-    clinic: { type: Schema.Types.ObjectId, ref: 'clinic' },
+    clinic: { type: Schema.Types.ObjectId, ref: 'clinic', index: true },
     consultationFee: { type: Number },
     labFee: { type: Number, default: 0 },
     medFee: { type: Number, default: 0 },
     otherFee: { type: Number, default: 0 },
     boardingFee: { type: Number, default: 0 },
     method: { type: String, default: 'mobile' },
-    consultationFeepaidAt: { type: Date, default: null },
-    labFeepaidAt: { type: Date, default: null },
-    medFeepaidAt: { type: Date, default: null },
-    otherFeepaidAt: { type: Date, default: null },
-    boardingFeepaidAt: { type: Date, default: null },
+    track: { type: String, default: 'reg_billing' },
+    consultationFeepaidAt: { type: Date, default: null, index: true },
+    labFeepaidAt: { type: Date, default: null, index: true },
+    medFeepaidAt: { type: Date, default: null, index: true },
+    otherFeepaidAt: { type: Date, default: null, index: true },
+    boardingFeepaidAt: { type: Date, default: null, index: true },
     status: { type: String, default: 'pending' },
 
 

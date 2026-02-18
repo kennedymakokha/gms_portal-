@@ -25,12 +25,12 @@ export interface patientLabRecord extends Document {
 const patientslabSchema = new Schema<patientLabRecord>({
 
     uuid: { type: String, unique: true },
-    visitId: { type: Schema.Types.ObjectId, ref: 'visits' },
-    patientId: { type: Schema.Types.ObjectId, ref: 'patient' },
-    created_by: { type: Schema.Types.ObjectId, ref: 'user' },
-    orderedBy: { type: Schema.Types.ObjectId, ref: 'user' },
+    visitId: { type: Schema.Types.ObjectId, ref: 'Visits' },
+    patientId: { type: Schema.Types.ObjectId, ref: 'Patient' },
+    created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    orderedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     labtechId: { type: Schema.Types.ObjectId, ref: 'User' },
-    testId: { type: Schema.Types.ObjectId, ref: 'lab' },
+    testId: { type: Schema.Types.ObjectId, ref: 'labs' },
     clinic: { type: Schema.Types.ObjectId, ref: 'clinic' },
     results: { type: String },
     Order_ID: { type: String },

@@ -5,6 +5,35 @@ import Visits from '../models/visitModel';
 import Payments, { PaymentRecord } from '../models/paymentModal'
 import { Types } from "mongoose";
 
+
+import Labs from '../models/labModel'
+import PatientLab from '../models/patientlabsModal'
+
+import User from '../models/userModel';
+
+
+
+interface Invoice {
+  id: string;
+  patientId: string;
+  patientName: string;
+  date: string;
+  items: InvoiceItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: "pending" | "paid" | "overdue" | "cancelled";
+  paymentMethod?: "cash" | "card" | "insurance" | "mobile";
+  paidAt?: string;
+}
+
+interface InvoiceItem {
+  description: string;
+  category: "consultation" | "lab-test" | "procedure" | "medication" | "bed" | "other";
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
 export const createPayment = async (req: AuthRequest, res: Response) => {
   try {
     const { uuid, patientId, visitId, track } = req.body;
@@ -26,6 +55,7 @@ export const createPayment = async (req: AuthRequest, res: Response) => {
       "otherFeepaidAt",
       "boardingFeepaidAt",
       "status",
+      "track",
     ];
 
     const updateData: Partial<PaymentRecord> = {};
@@ -121,7 +151,6 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
 
     if (track) {
       const billingTracks = ['reg_billing', 'lab_billing', 'med_billing'];
-
       if (track === 'billing') {
         filter.track = { $in: billingTracks };
       } else {
@@ -129,12 +158,28 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
       }
     }
 
-
-
+ console.log(filter);
     const [payments, total] = await Promise.all([
       Payments.find(filter)
         .populate('patientId', 'name uuid track')
-        .populate('visitId')
+        .populate({
+          path: 'visitId',
+          select: 'patientID assignedDoctor prescribedTests',
+          populate: [
+            {
+              path: 'assignedDoctor',
+              select: 'name department',
+              populate: {
+                path: 'department',
+                select: 'name consultationFee',
+              },
+            },
+            {
+              path: 'prescribedTests',
+              select: 'testName price',
+            }
+          ]
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -142,6 +187,7 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
 
       Payments.countDocuments(filter),
     ]);
+
 
     // 8️⃣ Return response
     res.status(200).json({
@@ -158,5 +204,120 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+
+export const getmonthlysum = async (req: AuthRequest, res: Response) => {
+  try {
+    const now = new Date();
+
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const clinicId = req.user?.clinicId;
+
+    if (!clinicId) {
+      return res.status(400).json({ message: "Clinic ID missing" });
+    }
+
+    const clinicObjectId = new Types.ObjectId(clinicId);
+
+    const result = await Payments.aggregate([
+      {
+        $match: {
+          clinic: clinicObjectId
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalPaid: {
+            $sum: {
+              $add: [
+                {
+                  $cond: [
+                    {
+                      $and: [
+                        { $ne: ["$consultationFeepaidAt", null] },
+                        { $gte: ["$consultationFeepaidAt", start] },
+                        { $lte: ["$consultationFeepaidAt", end] }
+                      ]
+                    },
+                    "$consultationFee",
+                    0
+                  ]
+                },
+                {
+                  $cond: [
+                    {
+                      $and: [
+                        { $ne: ["$labFeepaidAt", null] },
+                        { $gte: ["$labFeepaidAt", start] },
+                        { $lte: ["$labFeepaidAt", end] }
+                      ]
+                    },
+                    "$labFee",
+                    0
+                  ]
+                },
+                {
+                  $cond: [
+                    {
+                      $and: [
+                        { $ne: ["$medFeepaidAt", null] },
+                        { $gte: ["$medFeepaidAt", start] },
+                        { $lte: ["$medFeepaidAt", end] }
+                      ]
+                    },
+                    "$medFee",
+                    0
+                  ]
+                },
+                {
+                  $cond: [
+                    {
+                      $and: [
+                        { $ne: ["$otherFeepaidAt", null] },
+                        { $gte: ["$otherFeepaidAt", start] },
+                        { $lte: ["$otherFeepaidAt", end] }
+                      ]
+                    },
+                    "$otherFee",
+                    0
+                  ]
+                },
+                {
+                  $cond: [
+                    {
+                      $and: [
+                        { $ne: ["$boardingFeepaidAt", null] },
+                        { $gte: ["$boardingFeepaidAt", start] },
+                        { $lte: ["$boardingFeepaidAt", end] }
+                      ]
+                    },
+                    "$boardingFee",
+                    0
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      total: result[0]?.totalPaid || 0
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to calculate monthly sum"
+    });
+  }
+};
+
 
 

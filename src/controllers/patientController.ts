@@ -115,12 +115,14 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
         (doctor?.department as any)?.fee || 0;
 
       // ✅ Visit UUID
-      const visitUuid = await getNextNumber({
-        base: "vst",
-        clinicId,
-        department: departmentName,
-        session,
-      });
+      const visitUuid =
+        await getNextNumber({
+          base: "vst",
+          clinicId,
+          department: `${generateSmartAbbreviation(departmentName)}`,
+          session,
+        });
+
 
 
       const visit = await new Visits({
@@ -135,7 +137,7 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
 
       // ✅ Payment UUID
       const paymentUuid = await getNextNumber({
-        base: "pymnt",
+        base: "Invoice",
         clinicId,
         department: `${generateSmartAbbreviation(departmentName)}/${generateSmartAbbreviation(req.body.status)}`,
         session,
@@ -199,13 +201,13 @@ export const getpatients = async (req: AuthRequest, res: Response) => {
         .limit(limit)
         .populate({
           path: 'visits',
-          select: 'patientID assignedDoctor',
+          select: 'patientID assignedDoctor uuid patientMongoose ',
           populate: {
             path: 'assignedDoctor',
-            select: 'name department',
+            select: 'name department uuid',
             populate: {
               path: 'department',
-              select: 'name fee',
+              select: 'name fee uuid',
             },
           },
         })
