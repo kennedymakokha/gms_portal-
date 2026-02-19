@@ -81,7 +81,7 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
       //   })),
       //   { session }
       // );
-      console.log(uuid);
+      
       await PatientLab.insertMany(
         prescribedTests.map((testId: string, index: number) => ({
           testId,
@@ -320,7 +320,7 @@ export const getLaborders = async (req: AuthRequest, res: Response) => {
  */
 export const updateSingleLabTestStatus = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();
-
+ 
   try {
     session.startTransaction();
 
@@ -349,7 +349,7 @@ export const updateSingleLabTestStatus = async (req: Request, res: Response) => 
 
     // 3️⃣ If no remaining tests, update Visit & Payment track
     if (remaining === 0) {
-      await Visits.findOneAndUpdate(
+     let visit = await Visits.findOneAndUpdate(
         { _id: visitId },
         { $set: { track: "post-lab" } },
         { session, new: true }
@@ -360,6 +360,12 @@ export const updateSingleLabTestStatus = async (req: Request, res: Response) => 
         { $set: { track: "post-lab" } },
         { session }
       );
+      await Patient.findOneAndUpdate(
+        { _id:visit?.patientMongoose },
+        { $set: { track: "post-lab" } },
+        { session }
+      );
+      console.log(visit);
     }
 
     await session.commitTransaction();

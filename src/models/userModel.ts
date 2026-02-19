@@ -1,21 +1,7 @@
 import { Schema, model, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-// export enum UserRole {
-//   ADMIN = 'ADMIN',
-//   MECHANIC = 'MECHANIC',
-//   CLERK = 'CLERK'
-// }
-// name: string;
-// email: string;
-// phone: string;
-// specialty: string;
-// department: string;
-// status: 'active' | 'on-leave' | 'inactive';
-// experience: number;
-// qualification: string;
-// avatar ?: string;
-// schedule ?: string;
+
 export enum UserRole {
   admin = 'admin',
   doctor = 'doctor',

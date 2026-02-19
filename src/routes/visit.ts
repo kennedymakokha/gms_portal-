@@ -12,7 +12,5 @@ router.get('/visits', authenticate, authorize([UserRole.admin,UserRole.nurse]), 
 
 router.get('/visits/lab-orders', authenticate, authorize([UserRole.admin,UserRole.nurse]), getLaborders);      // Read
 
-// router.put('/visits/:id', authenticate, authorize([UserRole.admin]), updatepatient); // Update
-router.delete('/visits/:id', authenticate, authorize([UserRole.admin]), deletevisit); // Delete
 
 export default router;

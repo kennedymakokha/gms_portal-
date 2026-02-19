@@ -4,7 +4,7 @@ import User, { UserRole } from '../models/userModel';
 import { Format_phone_number } from '../utils/formatNUmber';
 import generateTokens from '../utils/generatetoken';
 
-
+import Dept from '../models/deptModel';
 import { serialize } from "cookie";
 import bcrypt from "bcryptjs";
 
@@ -13,6 +13,7 @@ import { jwtDecode } from "jwt-decode";
 import { MakeActivationCode } from '../utils/mkActivation';
 import { AuthRequest } from '../middleware/auth';
 import { Query } from 'mongoose';
+import { getNextNumber } from '../utils/getNextNumber';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'development_secret_key_change_in_prod';
 export const login = async (req: Request, res: Response) => {
@@ -65,11 +66,18 @@ export const login = async (req: Request, res: Response) => {
 
 };
 
+import mongoose from "mongoose";
+
 export const register = async (req: AuthRequest, res: Response) => {
+  const clinicId = req.user?.clinicId!;
+  const userId = req.user?.id!;
+  const session = await mongoose.startSession(); // start session
 
   try {
-    const {
-      uuid, // generate new UUID if not provided
+    session.startTransaction(); // start transaction
+
+    let {
+      uuid,
       name,
       phone_number,
       password,
@@ -84,13 +92,25 @@ export const register = async (req: AuthRequest, res: Response) => {
       avatar,
       schedule,
       isDeleted
-
     } = req.body;
 
     // Format phone number
     const formattedPhone = await Format_phone_number(phone_number);
 
-    // Use findOneAndUpdate with upsert like createDrug
+    // 🔐 Hash password
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password || formattedPhone, salt);
+
+    // Generate UUID inside transaction if not provided
+    if (!uuid) {
+      uuid = await getNextNumber({
+        base: "staff",
+        clinicId,
+        session, // pass session to ensure atomic UUID generation
+      });
+    }
+
+    // Upsert user
     const user = await User.findOneAndUpdate(
       { uuid },
       {
@@ -98,10 +118,10 @@ export const register = async (req: AuthRequest, res: Response) => {
           name,
           username: formattedPhone,
           phone_number: formattedPhone,
-          password: password || formattedPhone,
-          role: role,
+          password: hashedPassword,
+          role,
           department,
-          clinic: req.user?.clinicId,
+          clinic: clinicId,
           email,
           specialty,
           status,
@@ -114,27 +134,43 @@ export const register = async (req: AuthRequest, res: Response) => {
           updated_at: new Date()
         },
         $setOnInsert: {
-          uuid, // ensure UUID is set on insert
-          created_by: req.user?.id,
+          uuid,
+          created_by: userId,
           created_at: new Date()
         }
       },
       {
         upsert: true,
-        new: true
+        new: true,
+        session // attach session here
       }
     );
-    console.log("user",user)
+
+    // Add user to department staff list
+    await Dept.findByIdAndUpdate(
+      department,
+      { $push: { staffs: user._id } },
+      { session } // attach session here
+    );
+
+    // Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+
     return res.status(201).json({
       ok: true,
       message: "User registered successfully",
       user
     });
   } catch (error: any) {
-    console.log(error);
+    // Rollback transaction
+    await session.abortTransaction();
+    session.endSession();
+    console.error(error);
     return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 export const getUserOverview = async (req: AuthRequest, res: Response) => {
   try {
 
@@ -214,7 +250,15 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
         .limit(limit),
       User.countDocuments(filter),
     ]);
+    // for (let index = 0; index < users.length; index++) {
+    //   const element = users[index];
+    //   await Dept.findByIdAndUpdate(
+    //     element.department,
+    //     { $push: { staffs: element._id } },
 
+    //   );
+
+    // }
     // ================= RESPONSE =================
     res.status(200).json({
       data: users,

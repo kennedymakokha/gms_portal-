@@ -58,34 +58,6 @@ app.use('/api', wardsRoute);
 app.use('/api', paymentsRoute);
 
 
-
-
-
-app.post("/scan", async (req, res) => {
-  try {
-    const result = await runScanner();
-
-    if (!result.success) {
-      return res.status(500).json(result);
-    }
-
-    res.json({
-      success: true,
-      message: "Fingerprint captured",
-      templateSize: result.template_size,
-    });
-  } catch (err: any) {
-    console.log(err);
-    res.status(500).json({
-      success: false,
-      error: err.message,
-    });
-  }
-});
-
-
-
-
 // Start
 const start = async () => {
   await connectDB();

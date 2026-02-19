@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 
 export interface IDepartment extends Document {
   name: string;
@@ -7,6 +7,8 @@ export interface IDepartment extends Document {
   uuid: string;
   fee: number
   clinic?: string;
+  patients?: Types.ObjectId[];
+  staffs?: Types.ObjectId[];
   created_by?: Schema.Types.ObjectId;
   deletedAt?: Date | null;
   isDeleted: boolean
@@ -18,6 +20,8 @@ const DepartmentSchema = new Schema<IDepartment>({
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
   head: { type: Schema.Types.ObjectId, ref: 'User' },
   uuid: { type: String, unique: true },
+  patients: [{ type: Schema.Types.ObjectId, ref: "Patient" }],
+  staffs: [{ type: Schema.Types.ObjectId, ref: "Users" }],
   description: { type: String },
   fee: { type: Number, default: 500 },
   isDeleted: {

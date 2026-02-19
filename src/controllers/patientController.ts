@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import Patient from '../models/patientModel';
+import Dept from '../models/deptModel';
 import Visits, { IVisits } from '../models/visitModel';
 import Payment, { PaymentRecord } from '../models/paymentModal';
 import mongoose, { HydratedDocument } from 'mongoose';
@@ -9,6 +10,7 @@ import { getNextNumber, generateSmartAbbreviation } from '../utils/getNextNumber
 import { getPagination } from '../utils/pagination';
 import { parseQueryParam } from '../utils/queryParser';
 import { buildPatientFilter } from './filters/patientFilters';
+import bcrypt from "bcryptjs";
 
 
 
@@ -42,6 +44,7 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
       nokRelationship,
       assignedDoctor,
       nokPhone,
+      guardianphone,
       history,
       address,
       admissionDate,
@@ -63,30 +66,54 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // 🔐 Hash password
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(uuid, salt);
+
+    // 🔢 Calculate age
+    const age = Math.floor(
+      (new Date().getTime() - new Date(dob).getTime()) /
+      (1000 * 60 * 60 * 24 * 365.25)
+    );
+
+    // 🔹 Assign phone/guardianphone properly
+    let phoneToSave = phone ?? "";
+    let guardianToSave = guardianphone ?? "";
+
+    if (age < 18) {
+      guardianToSave = phoneToSave;
+      phoneToSave = "";
+    }
+
+    // 🔹 Construct $set object
+    const setData: any = {
+      name,
+      dob,
+      sex,
+      phone: phoneToSave,
+      guardianphone: guardianToSave,
+      bloodgroup: bloodgroup ?? "",
+      room: room ?? "",
+      status: status ?? "outpatient",
+      nationalId: nationalId ? String(nationalId) : "",
+      nokName: nokName ?? "",
+      nokRelationship: nokRelationship ?? "",
+      assignedDoctor: assignedDoctor ?? null,
+      nokPhone: nokPhone ?? "",
+      history: history ?? "",
+      address: address ?? "",
+      password: hashedPassword,
+      admissionDate: admissionDate ?? null,
+      clinic: clinicId,
+      updatedAt: new Date(),
+      isDeleted,
+    };
+
     // ✅ Upsert Patient
     const patient = await Patient.findOneAndUpdate(
       { uuid },
       {
-        $set: {
-          name,
-          dob,
-          sex,
-          phone,
-          bloodgroup,
-          room,
-          status,
-          nationalId,
-          nokName,
-          nokRelationship,
-          assignedDoctor,
-          nokPhone,
-          history,
-          isDeleted,
-          address,
-          admissionDate,
-          clinic: clinicId,
-          updatedAt: new Date(),
-        },
+        $set: setData,
         $setOnInsert: {
           uuid,
           created_by: userId,
@@ -103,27 +130,20 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
 
     // ✅ Only create visit if new patient
     if (patient.visits?.length === 0 && !isDeleted) {
-
       const doctor = await User.findById(assignedDoctor)
         .populate({ path: "department", select: "fee name" })
         .session(session);
 
-      const departmentName =
-        (doctor?.department as any)?.name || undefined;
+      const departmentName = (doctor?.department as any)?.name || undefined;
+      const departmentId = (doctor?.department as any)?._id || undefined;
+      const consultationFee = (doctor?.department as any)?.fee || 0;
 
-      const consultationFee =
-        (doctor?.department as any)?.fee || 0;
-
-      // ✅ Visit UUID
-      const visitUuid =
-        await getNextNumber({
-          base: "vst",
-          clinicId,
-          department: `${generateSmartAbbreviation(departmentName)}`,
-          session,
-        });
-
-
+      const visitUuid = await getNextNumber({
+        base: "vst",
+        clinicId,
+        department: `${generateSmartAbbreviation(departmentName)}`,
+        session,
+      });
 
       const visit = await new Visits({
         uuid: visitUuid,
@@ -135,11 +155,10 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
         track: "reg_billing",
       }).save({ session });
 
-      // ✅ Payment UUID
       const paymentUuid = await getNextNumber({
         base: "Invoice",
         clinicId,
-        department: `${generateSmartAbbreviation(departmentName)}/${generateSmartAbbreviation(req.body.status)}`,
+        department: `${generateSmartAbbreviation(departmentName)}/${generateSmartAbbreviation(status ?? "outpatient")}`,
         session,
       });
 
@@ -157,6 +176,11 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
         { $push: { visits: visit._id } },
         { session }
       );
+      await Dept.findByIdAndUpdate(
+        departmentId,
+        { $push: { patients: visit.patientMongoose } },
+        { session }
+      );
     }
 
     await session.commitTransaction();
@@ -166,7 +190,6 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
       message: isDeleted ? "Patient deleted" : "Patient saved",
       patient,
     });
-
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
