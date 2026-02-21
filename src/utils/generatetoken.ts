@@ -6,21 +6,30 @@ const generateTokens = (user: any) => {
   const accessToken = jwt.sign(
     {
       id: user._id,
-      username: user.username,
       role: user.role,
-      clinicId: user.clinic?._id // ✅ include clinicId here
+      username:user.name,
+      branchId: user.branch?._id,
+      clinicId: user.branch?.clinic?._id,
+      inpatient: user.branch?.inpatient, // 👈 useful for frontend
     },
-    process.env.JWT_SECRET || "development_secret_key_change_in_prod",
-    { expiresIn: "14d" } // Short expiration
+   process.env.JWT_SECRET || "development_secret_key_change_in_prod",
+    { expiresIn: "14d" }
   );
 
   const refreshToken = jwt.sign(
-    { userId: user._id, clinicId: user.clinic?._id }, // optional clinicId here too
-    process.env.REFRESH_SECRET || "development_secret_key_change_in_prod",
-    { expiresIn: "7d" } // Usually refresh tokens last longer
+    {
+      userId: user._id,
+      branchId: user.branch?._id,
+      clinicId: user.branch?.clinic?._id,
+
+    },
+   process.env.REFRESH_SECRET || "development_secret_key_change_in_prod",
+    { expiresIn: "7d" }
   );
 
   return { accessToken, refreshToken };
 };
+
+
 
 export default generateTokens;

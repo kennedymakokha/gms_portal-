@@ -15,12 +15,7 @@ import bcrypt from "bcryptjs";
 
 
 
-// Utility function to generate unified ID
-export const generateUnifiedId = (str: string) => {
-  const timestamp = Date.now();
-  const random = Math.floor(Math.random() * 1000000);
-  return `${str}_${timestamp}_${random}`;
-};
+
 
 export const createPatient = async (req: AuthRequest, res: Response) => {
   const session = await mongoose.startSession();
@@ -60,8 +55,9 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
     // ✅ Generate Patient UUID safely
     if (!uuid) {
       uuid = await getNextNumber({
-        base: "ptnt",
-        clinicId,
+        base: `PTN`,
+        clinicId: `${req.user?.clinicId}`,
+        branchId: `${req.user?.branchId}`,
         session,
       });
     }
@@ -104,7 +100,7 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
       address: address ?? "",
       password: hashedPassword,
       admissionDate: admissionDate ?? null,
-      clinic: clinicId,
+      branch: `${req.user?.branchId}`,
       updatedAt: new Date(),
       isDeleted,
     };
@@ -139,9 +135,9 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
       const consultationFee = (doctor?.department as any)?.fee || 0;
 
       const visitUuid = await getNextNumber({
-        base: "vst",
-        clinicId,
-        department: `${generateSmartAbbreviation(departmentName)}`,
+        base: `VST`,
+        clinicId: `${req.user?.clinicId}`,
+        branchId: `${req.user?.branchId}`,
         session,
       });
 
@@ -150,22 +146,22 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
         patientId: patient.uuid,
         patientMongoose: patient._id,
         assignedDoctor,
-        clinic: clinicId,
+        branch: `${req.user?.branchId}`,
         created_by: userId,
         track: "reg_billing",
       }).save({ session });
 
       const paymentUuid = await getNextNumber({
-        base: "Invoice",
-        clinicId,
-        department: `${generateSmartAbbreviation(departmentName)}/${generateSmartAbbreviation(status ?? "outpatient")}`,
+        base: `INV`,
+        clinicId: `${req.user?.clinicId}`,
+        branchId: `${req.user?.branchId}`,
         session,
       });
 
       await new Payment({
         uuid: paymentUuid,
         patientId: patient._id,
-        clinic: clinicId,
+        branch: `${req.user?.branchId}`,
         consultationFee,
         created_by: userId,
         visitId: visit._id,
@@ -200,6 +196,7 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
 
 
 export const getpatients = async (req: AuthRequest, res: Response) => {
+
   try {
     const { page, limit, skip } = getPagination(
       req.query.page as string,
@@ -211,7 +208,7 @@ export const getpatients = async (req: AuthRequest, res: Response) => {
     const track = parseQueryParam(req.query.track as string);
 
     const filter = buildPatientFilter({
-      clinicId: req.user?.clinicId,
+      branchId: req.user?.branchId,
       search,
       status,
       track,
@@ -258,10 +255,10 @@ export const getpatients = async (req: AuthRequest, res: Response) => {
 
 export const getPatientsOverview = async (req: AuthRequest, res: Response) => {
   try {
-    const clinicId = req.user?.clinicId;
+
 
     const result = await Patient.find({
-      clinic: clinicId,
+      clinic: req.user?.branchId,
       deletedAt: null,
       $or: [{ isDeleted: false }, { isDeleted: null }],
     }).select('name status assignedDoctor uuid')

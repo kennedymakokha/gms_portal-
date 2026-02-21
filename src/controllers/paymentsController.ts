@@ -6,11 +6,6 @@ import Payments, { PaymentRecord } from '../models/paymentModal'
 import { Types } from "mongoose";
 
 
-import Labs from '../models/labModel'
-import PatientLab from '../models/patientlabsModal'
-
-import User from '../models/userModel';
-
 
 
 interface Invoice {
@@ -68,9 +63,7 @@ export const createPayment = async (req: AuthRequest, res: Response) => {
 
 
     // Ensure clinicId and created_by are ObjectId
-    const clinicId = req.user?.clinicId
-      ? new Types.ObjectId(req.user.clinicId)
-      : undefined;
+  
     const createdBy = req.user?.id ? new Types.ObjectId(req.user.id) : undefined;
 
     // Upsert payment
@@ -81,7 +74,7 @@ export const createPayment = async (req: AuthRequest, res: Response) => {
           uuid,
           patientId: new Types.ObjectId(patientId),
           visitId: visitId ? new Types.ObjectId(visitId) : undefined,
-          clinic: clinicId,
+          branch: `${req.user?.branchId}`,
           created_by: createdBy,
         },
         ...(Object.keys(updateData).length ? { $set: updateData } : {}),
@@ -138,7 +131,7 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
 
     // 3️⃣ Base filter
     const filter: any = {
-      clinic: req.user?.clinicId,
+      branch: req.user?.branchId,
       deletedAt: null,
       $or: [{ isDeleted: false }, { isDeleted: null }],
     };
@@ -158,7 +151,7 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
       }
     }
 
- console.log(filter);
+
     const [payments, total] = await Promise.all([
       Payments.find(filter)
         .populate('patientId', 'name uuid track')
@@ -200,7 +193,6 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Get payments error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -213,18 +205,18 @@ export const getmonthlysum = async (req: AuthRequest, res: Response) => {
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    const clinicId = req.user?.clinicId;
+    const branchId = req.user?.branchId;
 
-    if (!clinicId) {
-      return res.status(400).json({ message: "Clinic ID missing" });
+    if (!branchId) {
+      return res.status(400).json({ message: "branch ID missing" });
     }
 
-    const clinicObjectId = new Types.ObjectId(clinicId);
+    const branchObjectId = new Types.ObjectId(branchId);
 
     const result = await Payments.aggregate([
       {
         $match: {
-          clinic: clinicObjectId
+          branch: branchObjectId
         }
       },
       {

@@ -35,7 +35,7 @@ export interface IPatient {
     | "admitted";
 
   created_by?: Types.ObjectId;
-  clinic?: Types.ObjectId;
+  branch?: Types.ObjectId;
   address?: string;
 
   admissionDate: Date | null;
@@ -97,9 +97,9 @@ const PatientSchema = new Schema<IPatient>(
 
     created_by: { type: Schema.Types.ObjectId, ref: "User" },
 
-    clinic: {
+    branch: {
       type: Schema.Types.ObjectId,
-      ref: "clinic",
+      ref: "branch",
       index: true,
     },
 

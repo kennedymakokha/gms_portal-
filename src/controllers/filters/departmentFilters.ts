@@ -1,13 +1,13 @@
 interface DepartmentFilterOptions {
-  clinicId?: string;
+  branchId?: string;
   search?: string;
 }
 
-export const buildDepartmentFilter = ({ clinicId, search }: DepartmentFilterOptions) => {
+export const buildDepartmentFilter = ({ branchId, search }: DepartmentFilterOptions) => {
   const filter: any = {
     deletedAt: null,
     isDeleted: false,
-    clinic: clinicId,
+    branch: branchId,
   };
 
   if (search) {

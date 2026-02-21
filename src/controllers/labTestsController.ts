@@ -1,6 +1,6 @@
-import mongoose from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { Response } from 'express';
-import Labs, { ILab } from '../models/labModel';
+import { ILab, Labs } from '../models/labModel';
 import { AuthRequest } from '../middleware/auth';
 import { getPagination } from '../utils/pagination';
 import { parseQueryParam } from '../utils/queryParser';
@@ -8,10 +8,11 @@ import { buildLabTestFilter } from './filters/labTestFilters';
 import { getNextNumber } from '../utils/getNextNumber';
 
 
+
 export const getLabs = async (req: AuthRequest, res: Response) => {
   try {
-    if (!req.user?.clinicId) {
-      return res.status(400).json({ message: 'Clinic ID missing in token' });
+    if (!req.user?.branchId) {
+      return res.status(400).json({ message: 'branch ID missing in token' });
     }
 
     const { page, limit, skip } = getPagination(
@@ -23,7 +24,7 @@ export const getLabs = async (req: AuthRequest, res: Response) => {
     const status = parseQueryParam(req.query.status as string);
 
     const filter = buildLabTestFilter({
-      clinicId: req.user.clinicId,
+      branchId: req.user.branchId,
       role: req.user.role,
       search,
       status,
@@ -60,13 +61,13 @@ export const createlab = async (req: AuthRequest, res: Response) => {
   session.startTransaction();
 
   try {
-    if (!req.user?.clinicId || !req.user?.id) {
+    if (!req.user?.branchId || !req.user?.id) {
       await session.abortTransaction();
       session.endSession();
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const clinicId = req.user.clinicId;
+    const branchId = req.user.branchId;
     const userId = req.user.id;
 
     let {
@@ -82,14 +83,19 @@ export const createlab = async (req: AuthRequest, res: Response) => {
     // Generate UUID inside transaction
     if (!uuid) {
       uuid = await getNextNumber({
-        base: "tst",
-        clinicId,
-        session, // 🔥 pass session here
+        base: `LAB-TST`,
+        clinicId: `${req.user?.clinicId}`,
+        branchId: `${req.user?.branchId}`,
+        session,
       });
     }
+  const filter: Partial<ILab> = {
+  uuid,
+  branch: new Types.ObjectId(branchId),
+};
 
     const lab = await Labs.findOneAndUpdate(
-      { uuid, clinic: clinicId },
+      filter,
       {
         $set: {
           testName,
@@ -98,7 +104,7 @@ export const createlab = async (req: AuthRequest, res: Response) => {
           turnaroundTime,
           requiresFasting,
           status,
-          clinic: clinicId,
+          branch: branchId,
           isDeleted: req.body.isDeleted ?? false,
           updated_at: new Date(),
         },
@@ -110,9 +116,10 @@ export const createlab = async (req: AuthRequest, res: Response) => {
       {
         upsert: true,
         new: true,
-        session, // 🔥 attach session here
+        session,
       }
     );
+
 
     await session.commitTransaction();
     session.endSession();
@@ -128,7 +135,7 @@ export const createlab = async (req: AuthRequest, res: Response) => {
 
 export const getLabOverview = async (req: AuthRequest, res: Response) => {
   try {
-    const clinicId = req.user?.clinicId;
+    const branchId = req.user?.branchId;
 
     // const statusFilter =
     //   req.user?.role === "admin"
@@ -136,7 +143,7 @@ export const getLabOverview = async (req: AuthRequest, res: Response) => {
     //     : "active";
 
     const result = await Labs.find({
-      // clinic: clinicId,
+      // branch: branchId,
       // status: statusFilter,
       deletedAt: null,
       $or: [{ isDeleted: false }, { isDeleted: null }],

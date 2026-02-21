@@ -2,16 +2,15 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import Patient from '../models/patientModel';
 import Visits from '../models/visitModel';
-import Labs from '../models/labModel'
+import { Labs } from '../models/labModel'
 import PatientLab from '../models/patientlabsModal'
 import mongoose from 'mongoose';
-import { generateUnifiedId } from './patientController';
 import { generateSmartAbbreviation, getNextNumber } from '../utils/getNextNumber';
 import { getPagination } from '../utils/pagination';
 import { parseQueryParam } from '../utils/queryParser';
 import { buildPatientFilter } from './filters/patientFilters';
 import { buildVisitFilter } from './filters/visitFilters';
-import { buildLabFilter } from './filters/labFilters';
+import { buildLabFilter, buildLabFilterByVisit } from './filters/labFilters';
 import Payment, { PaymentRecord } from '../models/paymentModal';
 import User from '../models/userModel';
 
@@ -46,7 +45,6 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
 
     const { uuid, patientMongoose, prescribedTests, orderedBy
     } = req.body;
-    const clinicId = req.user?.clinicId!;
     if (!uuid) {
       return res.status(400).json({ error: "uuid required" });
     }
@@ -56,45 +54,44 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
       .populate({ path: "department", select: "fee name" })
       .session(session);
 
-    const departmentName =
-      (doctor?.department as any)?.name || undefined;
-    // 🔁 Rebuild labs + recalc fee (idempotent)
+
     if (Array.isArray(prescribedTests)) {
       await PatientLab.deleteMany({ visitUuid: uuid }).session(session);
 
       const testUUid = await getNextNumber({
-        base: "LO",
-        clinicId,
-        department: `${generateSmartAbbreviation(departmentName)}`,
+        base: `LAB-ORD`,
+        clinicId: `${req.user?.clinicId}`,
+        branchId: `${req.user?.branchId}`,
         session,
       });
 
+      // 1️⃣ Insert tests and capture inserted docs
 
-      // await PatientLab.insertMany(
-      //   prescribedTests.map((testId: string) => ({
-      //     testId,
-      //     uuid: testUUid,
-      //     clinic: clinicId,
-      //     patientMongoose,
-      //     patientId: req.body.patientId,
-      //     created_by: req.user?.id,
-      //   })),
-      //   { session }
-      // );
-      
-      await PatientLab.insertMany(
+
+      const insertedTests = await PatientLab.insertMany(
         prescribedTests.map((testId: string, index: number) => ({
           testId,
-          uuid: `${testUUid}/${index + 1}`,  // start from 1
+          uuid: `${testUUid}/${index + 1}`,
           visitId: req.body.visitId,
-          clinic: clinicId,
+          branch: `${req.user?.branchId}`,
           patientMongoose,
           patientId: req.body.patientId,
           created_by: req.user?.id,
         })),
         { session }
       );
+      for (let index = 0; index < insertedTests.length; index++) {
+        const element = insertedTests[index];
+        // 3️⃣ Push all into Visit.prescribedTests
+        await Visits.findByIdAndUpdate(
+          req.body.visitId,
+          { $push: { prescribedTests: element._id } },
 
+          { session }
+        );
+
+
+      }
 
 
       const labs = await Labs.find({
@@ -104,7 +101,7 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
         .session(session);
 
       req.body.totallabTestFee = labs.reduce(
-        (sum, l) => sum + Number(l.price || 0),
+        (sum: any, l) => sum + Number(l.price || 0),
         0
       );
     }
@@ -112,7 +109,6 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
     const ALLOWED_UPDATE_FIELDS = [
       "chiefComplaint",
       "symptoms",
-      "prescribedTests",
       "notes",
       "track",
       "totallabTestFee",
@@ -127,6 +123,7 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
       "oxygenSaturation",
       "labtechId",
       "vitalsNurseId",
+      'prescribedTests',
       "weight",
       "height",
       "bmi",
@@ -146,7 +143,7 @@ export const createVisit = async (req: AuthRequest, res: Response) => {
           uuid,
           patientMongoose,
           patientId: req.body.patientId,
-          clinic: req.user?.clinicId,
+          branch: req.user?.branchId,
           created_by: req.user?.id,
         },
         ...(Object.keys(updateData).length && { $set: updateData }),
@@ -213,7 +210,7 @@ export const getvisits = async (req: AuthRequest, res: Response) => {
     const track = parseQueryParam(req.query.track as string);
 
     const filter = buildVisitFilter({
-      clinicId: req.user?.clinicId,
+      branchId: req.user?.branchId,
       track,
     });
 
@@ -256,7 +253,7 @@ export const getLaborders = async (req: AuthRequest, res: Response) => {
     const status = parseQueryParam(req.query.status as string);
 
     const filter = buildLabFilter({
-      clinicId: req.user?.clinicId,
+      branchId: req.user?.branchId,
       status,
     });
 
@@ -306,7 +303,67 @@ export const getLaborders = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: error.message });
   }
 };
+export const getLabordersByVisit = async (req: AuthRequest, res: Response) => {
+  try {
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
 
+    const status = parseQueryParam(req.query.status as string);
+
+    const filter = buildLabFilterByVisit({
+      branchId: req.user?.branchId,
+      status,
+      visitId:`${req.params.id}`
+    });
+
+    const [patientsLab, total] = await Promise.all([
+      PatientLab.find(filter)
+        
+        .populate('testId')
+        .populate('labtechId', 'name uuid')
+        .populate({
+          path: 'visitId',
+          select: 'patientID assignedDoctor patientMongoose',
+          populate: [
+            {
+              path: 'assignedDoctor',
+              select: 'name department',
+              populate: {
+                path: 'department',
+                select: 'name consultationFee',
+              },
+            },
+            {
+              path: 'patientMongoose',
+              select: 'name',
+            },
+          ],
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
+      PatientLab.countDocuments(filter),
+    ]);
+
+
+    res.status(200).json({
+      data: patientsLab,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error fetching lab orders:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
 
 /**
  * Updates the status of lab tests for a visit.
@@ -320,11 +377,11 @@ export const getLaborders = async (req: AuthRequest, res: Response) => {
  */
 export const updateSingleLabTestStatus = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();
- 
+
   try {
     session.startTransaction();
 
-    const { visitId, testUuid, status, result } = req.body;
+    const { visitId, testUuid, status, results } = req.body;
     if (!visitId || !testUuid || !status) {
       return res.status(400).json({ error: "visitId, testUuid and status are required" });
     }
@@ -332,7 +389,7 @@ export const updateSingleLabTestStatus = async (req: Request, res: Response) => 
     // 1️⃣ Update the specific test
     const labTest = await PatientLab.findOneAndUpdate(
       { uuid: testUuid, visitId },
-      { $set: { status, result } },
+      { $set: { status, results} },
       { session, new: true }
     );
 
@@ -349,7 +406,7 @@ export const updateSingleLabTestStatus = async (req: Request, res: Response) => 
 
     // 3️⃣ If no remaining tests, update Visit & Payment track
     if (remaining === 0) {
-     let visit = await Visits.findOneAndUpdate(
+      let visit = await Visits.findOneAndUpdate(
         { _id: visitId },
         { $set: { track: "post-lab" } },
         { session, new: true }
@@ -361,11 +418,11 @@ export const updateSingleLabTestStatus = async (req: Request, res: Response) => 
         { session }
       );
       await Patient.findOneAndUpdate(
-        { _id:visit?.patientMongoose },
+        { _id: visit?.patientMongoose },
         { $set: { track: "post-lab" } },
         { session }
       );
-      console.log(visit);
+
     }
 
     await session.commitTransaction();
@@ -385,21 +442,3 @@ export const updateSingleLabTestStatus = async (req: Request, res: Response) => 
 };
 
 
-export const deletevisit = async (req: AuthRequest, res: Response) => {
-  try {
-    const visit = await Visits.findByIdAndUpdate(
-      req.params.id,
-      { deletedAt: new Date() },
-      { new: true }
-    );
-
-    if (!visit) {
-      return res.status(404).json({ message: 'visit not found' });
-    }
-
-    res.json({ message: ' visit deleted', visit });
-  } catch (error: any) {
-    console.error(' Error deleting visit:', error);
-    res.status(500).json({ message: error.message });
-  }
-};

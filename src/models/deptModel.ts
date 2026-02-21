@@ -6,7 +6,7 @@ export interface IDepartment extends Document {
   head: Schema.Types.ObjectId,
   uuid: string;
   fee: number
-  clinic?: string;
+  branch: Types.ObjectId;
   patients?: Types.ObjectId[];
   staffs?: Types.ObjectId[];
   created_by?: Schema.Types.ObjectId;
@@ -16,14 +16,14 @@ export interface IDepartment extends Document {
 
 const DepartmentSchema = new Schema<IDepartment>({
   name: { type: String, required: true, unique: true },
-  clinic: { type: String },
+  branch:  { type: Schema.Types.ObjectId, ref: 'branch' },
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
   head: { type: Schema.Types.ObjectId, ref: 'User' },
   uuid: { type: String, unique: true },
   patients: [{ type: Schema.Types.ObjectId, ref: "Patient" }],
   staffs: [{ type: Schema.Types.ObjectId, ref: "Users" }],
   description: { type: String },
-  fee: { type: Number, default: 500 },
+  fee: { type: Number },
   isDeleted: {
     type: Boolean,
     default: false,

@@ -17,7 +17,7 @@ export interface IUser extends Document {
   uuid: string
   department?: Schema.Types.ObjectId;
   createdBy?: Schema.Types.ObjectId;
-  clinic?: Schema.Types.ObjectId;
+  branch?: Schema.Types.ObjectId;
   email?: string;
   specialty: string;
   status: 'active' | 'on-leave' | 'inactive';
@@ -42,7 +42,7 @@ const UserSchema = new Schema<IUser>({
   status: { type: String },
   uuid: { type: String, unique: true },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
-  clinic: { type: Schema.Types.ObjectId, ref: 'clinic' },
+  branch: { type: Schema.Types.ObjectId, ref: 'branch' },
   isDeleted: {
     type: Boolean,
     default: false,

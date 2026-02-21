@@ -6,7 +6,7 @@ export interface patientLabRecord extends Document {
     visitId: Schema.Types.ObjectId;
     patientId: Schema.Types.ObjectId;
     created_by: Schema.Types.ObjectId;
-    clinic: Schema.Types.ObjectId;
+    branch: Schema.Types.ObjectId;
     testId: Schema.Types.ObjectId;
     results: String;
     notes: String;
@@ -31,7 +31,7 @@ const patientslabSchema = new Schema<patientLabRecord>({
     orderedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     labtechId: { type: Schema.Types.ObjectId, ref: 'User' },
     testId: { type: Schema.Types.ObjectId, ref: 'labs' },
-    clinic: { type: Schema.Types.ObjectId, ref: 'clinic' },
+    branch: { type: Schema.Types.ObjectId, ref: 'branch' },
     results: { type: String },
     Order_ID: { type: String },
     notes: { type: String },

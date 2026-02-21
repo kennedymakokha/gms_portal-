@@ -1,18 +1,18 @@
 interface LabFilterOptions {
-  clinicId?: string;
+  branchId?: string;
   search?: string;
   role?: string;
   status?: string;
 }
 
-export const buildLabTestFilter = ({ clinicId, search, role, status }: LabFilterOptions) => {
+export const buildLabTestFilter = ({ branchId, search, role, status }: LabFilterOptions) => {
   const statusFilter =
     role === "admin"
       ? { $in: ["active", "inactive"] }
       : "active";
 
   const filter: any = {
-    clinic: clinicId,
+    branch: branchId,
     status: status || statusFilter,
     deletedAt: null,
     $or: [{ isDeleted: false }, { isDeleted: null }],

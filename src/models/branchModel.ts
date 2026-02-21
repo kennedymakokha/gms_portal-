@@ -7,7 +7,8 @@ const branchSchema = new mongoose.Schema({
   uuid: { type: String, unique: true },
   inpatient: { type: Boolean, default: false },
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
-  clinic: { type: Schema.Types.ObjectId, ref: 'User' },
+  clinic: { type: Schema.Types.ObjectId, ref: 'clinic' },
+  departments: [{ type: Schema.Types.ObjectId, ref: "Department" }],
   head: { type: Schema.Types.ObjectId, ref: 'User' },
   isDeleted: {
     type: Boolean,

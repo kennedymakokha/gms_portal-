@@ -6,7 +6,7 @@ export interface PaymentRecord extends Document {
     visitId: Schema.Types.ObjectId;
     patientId: Schema.Types.ObjectId;
     created_by: Schema.Types.ObjectId;
-    clinic: Schema.Types.ObjectId;
+    branch: Schema.Types.ObjectId;
     consultationFee: number;
     labFee: number;
     medFee: number;
@@ -38,7 +38,7 @@ const invoiceSchema = new Schema<PaymentRecord>({
     visitId: { type: Schema.Types.ObjectId, ref: 'Visits' },
     patientId: { type: Schema.Types.ObjectId, ref: 'Patient' },
     created_by: { type: Schema.Types.ObjectId, ref: 'User' },
-    clinic: { type: Schema.Types.ObjectId, ref: 'clinic', index: true },
+    branch: { type: Schema.Types.ObjectId, ref: 'branch', index: true },
     consultationFee: { type: Number },
     labFee: { type: Number, default: 0 },
     medFee: { type: Number, default: 0 },

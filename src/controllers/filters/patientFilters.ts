@@ -1,18 +1,18 @@
 interface PatientFilterOptions {
-  clinicId?: string;
+  branchId?: string;
   search?: string;
   status?: string;
   track?: string;
 }
 
 export const buildPatientFilter = ({
-  clinicId,
+  branchId,
   search,
   status,
   track,
 }: PatientFilterOptions) => {
   const filter: any = {
-    clinic: clinicId,
+    branch: branchId,
     deletedAt: null,
     $or: [{ isDeleted: false }, { isDeleted: null }],
   };

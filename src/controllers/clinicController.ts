@@ -9,9 +9,14 @@ import Clinic from '../models/clinicModel';
 import { buildClinicFilter } from './filters/clinicFilters';
 import { generateSmartAbbreviation, getNextNumber, getNextNumberWithoutBranch } from '../utils/getNextNumber';
 import mongoose from 'mongoose';
-import { generateUnifiedId } from './patientController';
+
 import { buildBranchFilter } from './filters/branchFilters';
 
+export const generateUnifiedId = (str: string) => {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000000);
+  return `${str}_${timestamp}_${random}`;
+};
 
 
 export const saveClinic = async (req: AuthRequest, res: Response) => {
@@ -115,6 +120,7 @@ export const saveBranch = async (req: AuthRequest, res: Response) => {
       "phone",
       "branchName",
       "inpatient",
+      "clinic",
       "head",
       "isDeleted",
       "deletedAt",
@@ -127,6 +133,7 @@ export const saveBranch = async (req: AuthRequest, res: Response) => {
         updateData[field] = req.body[field];
       }
     }
+console.log(req.body);
 
     const branch = await Branch.findOneAndUpdate(
       { uuid },
@@ -134,6 +141,7 @@ export const saveBranch = async (req: AuthRequest, res: Response) => {
         $setOnInsert: {
           uuid,
           created_by: req.user?.id,
+          clinic: clinic,
         },
         ...(Object.keys(updateData).length && { $set: updateData }),
       },

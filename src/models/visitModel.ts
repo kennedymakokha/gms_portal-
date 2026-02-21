@@ -8,7 +8,7 @@ export interface IVisits {
   patientId: string;   // reference to the patient (as string)
   patientMongoose: Schema.Types.ObjectId;   // reference to the patient (as string)
   notes: string;         // optional notes about the visit
-  clinic: string;        // reference to the clinic (as string)
+  branch: Schema.Types.ObjectId;        // reference to the branch (as string)
   disposition: string;   // disposition of the visit
   diagnosis: string;     // diagnosis of the visit
   labOrders: string;     // lab orders for the visit
@@ -35,7 +35,7 @@ export interface IVisits {
   chiefComplaint: string;
   symptoms: string[];
   totallabTestFee: number;
-  prescribedTests: string[];
+  prescribedTests: Schema.Types.ObjectId[];
   testResults?: Record<string, string>;
   prescribedProcedures: string[];
   medications?: string[];
@@ -100,7 +100,7 @@ const visitSchema = new Schema<IVisits>(
       type: Date,
       default: null,
     },
-    clinic: {
+    branch: {
       type: String,
       required: true,
     },
@@ -125,7 +125,7 @@ const visitSchema = new Schema<IVisits>(
     prescribedTests: [
       {
         type: Schema.Types.ObjectId,
-        ref: 'labs',
+        ref: 'patientslab',
       },
     ],
 
@@ -142,14 +142,8 @@ const visitSchema = new Schema<IVisits>(
         ref: 'procedure',
       },
     ],
-    labOrders: {
-      type: String,
-      default: '',
-    },
-    pharmacyInstructions: {
-      type: String,
-      default: '',
-    },
+   
+  
     bp: {
       type: String,
       default: '',

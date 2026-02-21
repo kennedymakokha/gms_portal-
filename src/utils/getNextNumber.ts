@@ -42,22 +42,21 @@ export async function getNextNumber({
 
   const prefix = parts.join("-");
 
-  const counter = await Counter.findOneAndUpdate(
-    {
-      clinic: clinicId,
-      branch: branchId,
-      key: prefix,
-    },
-    {
-      $inc: { seq: 1 },
-      $setOnInsert: { seq: 1 },
-    },
-    {
-      new: true,
-      upsert: true,
-      session,
-    }
-  );
+ const counter = await Counter.findOneAndUpdate(
+  {
+    clinic: clinicId,
+    branch: branchId,
+    key: prefix,
+  },
+  {
+    $inc: { seq: 1 },
+  },
+  {
+    new: true,
+    upsert: true,
+    session,
+  }
+);
 
   const sequence = counter?.seq ?? 1;
 

@@ -13,6 +13,12 @@ const CounterSchema: Schema = new Schema(
       required: true,
       ref: "Clinic",
     },
+    branch: {
+      type: Schema.Types.ObjectId,
+      ref: "branch",
+      required: true,
+      index: true,
+    },
     key: {
       type: String,
       required: true,

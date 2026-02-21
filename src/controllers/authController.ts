@@ -13,9 +13,8 @@ import { jwtDecode } from "jwt-decode";
 import { MakeActivationCode } from '../utils/mkActivation';
 import { AuthRequest } from '../middleware/auth';
 import { Query } from 'mongoose';
-import { getNextNumber } from '../utils/getNextNumber';
+import { generateSmartAbbreviation, getNextNumber } from '../utils/getNextNumber';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'development_secret_key_change_in_prod';
 export const login = async (req: Request, res: Response) => {
 
   try {
@@ -23,7 +22,7 @@ export const login = async (req: Request, res: Response) => {
       res.status(405).json("Method Not Allowed")
       return
     };
-    console.log(req.body)
+
     const { phone_number, password } = req.body;
     let phone = await Format_phone_number(phone_number); //format the phone number
 
@@ -32,7 +31,18 @@ export const login = async (req: Request, res: Response) => {
         { username: phone_number },
         { phone_number: phone }
       ]
-    }).select("phone_number username role activated password clinic").populate('clinic');
+    }).select("phone_number username name role activated password branch")
+      .populate({
+        path: 'branch',
+        select: 'clinic branchName inpatient phone',
+        populate: [
+          {
+            path: 'clinic',
+            select: 'name branch',
+          },
+        ],
+      })
+    // .populate('clinic', 'branchName inpatient phone ');
 
     if (!userExists) {
       res.status(400).json("User Not Found")
@@ -44,7 +54,7 @@ export const login = async (req: Request, res: Response) => {
       return
     } else {
 
-      const { accessToken, refreshToken } = generateTokens(userExists);
+      const { accessToken } = generateTokens(userExists);
       const decoded = jwtDecode(accessToken);
 
       res.setHeader("Set-Cookie", serialize("sessionToken", accessToken, {
@@ -69,30 +79,17 @@ export const login = async (req: Request, res: Response) => {
 import mongoose from "mongoose";
 
 export const register = async (req: AuthRequest, res: Response) => {
-  const clinicId = req.user?.clinicId!;
   const userId = req.user?.id!;
   const session = await mongoose.startSession(); // start session
-
+ 
   try {
     session.startTransaction(); // start transaction
 
     let {
       uuid,
-      name,
       phone_number,
       password,
-      role,
-      department,
-      clinic,
-      email,
-      specialty,
-      status = 'active',
-      experience,
-      qualification,
-      avatar,
-      schedule,
-      isDeleted
-    } = req.body;
+      department } = req.body;
 
     // Format phone number
     const formattedPhone = await Format_phone_number(phone_number);
@@ -104,45 +101,57 @@ export const register = async (req: AuthRequest, res: Response) => {
     // Generate UUID inside transaction if not provided
     if (!uuid) {
       uuid = await getNextNumber({
-        base: "staff",
-        clinicId,
-        session, // pass session to ensure atomic UUID generation
+        base: `${generateSmartAbbreviation(req.body.role)}`,
+        clinicId: `${req.user?.clinicId}`,
+        branchId: `${req.user?.branchId}`,
+        session,
       });
     }
+    const ALLOWED_UPDATE_FIELDS = [
+      "name",
+      "phone_number",
+      "role",
+      "email",
+      "specialty",
+      "status",
+      "experience",
+      "qualification",
+      "avatar",
+      "schedule",
+      "isDeleted"
 
+    ];
+
+    const updateData: any = {};
+    for (const field of ALLOWED_UPDATE_FIELDS) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
     // Upsert user
+    // 🔐 Hash password
+
+
     const user = await User.findOneAndUpdate(
       { uuid },
       {
-        $set: {
-          name,
-          username: formattedPhone,
-          phone_number: formattedPhone,
-          password: hashedPassword,
-          role,
-          department,
-          clinic: clinicId,
-          email,
-          specialty,
-          status,
-          experience,
-          qualification,
-          avatar,
-          schedule,
-          isDeleted,
-          deletedAt: isDeleted ? new Date() : null,
-          updated_at: new Date()
-        },
         $setOnInsert: {
           uuid,
           created_by: userId,
+          department: department,
+          branch: `${req.user?.branchId}`,
+          password: hashedPassword,
           created_at: new Date()
-        }
+        },
+        ...(Object.keys(updateData).length && { $set: updateData }),
       },
-      {
-        upsert: true,
+
+     {
         new: true,
-        session // attach session here
+        upsert: true,
+        runValidators: true,
+        session,
+
       }
     );
 
@@ -222,7 +231,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
 
     // ================= BASE FILTER =================
     const filter: Record<string, any> = {
-      clinic: req.user?.clinicId,
+      branch: req.user?.branchId,
       deletedAt: null,
       $or: [{ isDeleted: false }, { isDeleted: null }],
     };

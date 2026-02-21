@@ -1,14 +1,33 @@
 interface LabFilterOptions {
-  clinicId?: string;
+  branchId?: string;
+  visitId?: string;
   status?: string;
 }
 
 export const buildLabFilter = ({
-  clinicId,
+  branchId,
   status,
 }: LabFilterOptions) => {
   const filter: any = {
-    clinic: clinicId,
+    branch: branchId,
+  };
+
+  if (status) {
+    filter.status = status;
+  }
+
+  return filter;
+};
+
+
+
+export const buildLabFilterByVisit = ({
+  branchId,
+  status,
+  visitId,
+}: LabFilterOptions) => {
+  const filter: any = {
+    branch: branchId,visitId
   };
 
   if (status) {
