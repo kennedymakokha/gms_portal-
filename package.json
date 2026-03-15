@@ -22,7 +22,8 @@
     "jsonwebtoken": "^9.0.3",
     "jwt-decode": "^4.0.0",
     "mongoose": "^9.1.2",
-    "morgan": "^1.10.1"
+    "morgan": "^1.10.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/cookie": "^0.6.0",

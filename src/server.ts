@@ -24,6 +24,8 @@ import patientProcedures from './routes/patientProcedures';
 import patientMedications from './routes/patientMedication';
 import wardsRoute from './routes/wards';
 import paymentsRoute from './routes/payments';
+import paymentsCareRoute from './routes/tasks';
+
 import { runScanner } from './utils/runscaner';
 dotenv.config();
 const scannerPath = "/home/user/Downloads/FDx_SDK_Pro_Linux_v4.0c/FDx SDK Pro for Linux v4.0c/FDx_SDK_PRO_LINUX4_X64_4_0_0/bin/linux4X64/sgfplibtest";
@@ -56,6 +58,7 @@ app.use('/api', patientMedications);
 app.use('/api', Bedroutes);
 app.use('/api', wardsRoute);
 app.use('/api', paymentsRoute);
+app.use('/api', paymentsCareRoute);
 
 
 // Start
