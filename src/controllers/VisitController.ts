@@ -62,79 +62,79 @@ export function getVitalStatus(vital: any): "normal" | "warning" | "critical" {
     return "warning";
   return "normal";
 }
-export const createVisit = async (req: any, res: any) => {
-  const session = await mongoose.startSession();
+// export const createVisit = async (req: any, res: any) => {
+//   const session = await mongoose.startSession();
 
-  try {
-    session.startTransaction();
+//   try {
+//     session.startTransaction();
 
-      const doctor = await User.findById(assignedDoctor)
-        .populate({ path: "department", select: "fee name" })
-        .session(session);
+//       const doctor = await User.findById(assignedDoctor)
+//         .populate({ path: "department", select: "fee name" })
+//         .session(session);
 
-      const departmentName = (doctor?.department as any)?.name || undefined;
-      const departmentId = (doctor?.department as any)?._id || undefined;
-      const consultationFee = (doctor?.department as any)?.fee || 0;
+//       const departmentName = (doctor?.department as any)?.name || undefined;
+//       const departmentId = (doctor?.department as any)?._id || undefined;
+//       const consultationFee = (doctor?.department as any)?.fee || 0;
 
-      const visitUuid = await getNextNumber({
-        base: `VST`,
-        clinicId: `${req.user?.clinicId}`,
-        branchId: `${req.user?.branchId}`,
-        session,
-      });
+//       const visitUuid = await getNextNumber({
+//         base: `VST`,
+//         clinicId: `${req.user?.clinicId}`,
+//         branchId: `${req.user?.branchId}`,
+//         session,
+//       });
 
-      const visit = await new Visits({
-        uuid: visitUuid,
-        patientId: patient.uuid,
-        patientMongoose: patient._id,
-        assignedDoctor,
-        branch: `${req.user?.branchId}`,
-        created_by: userId,
-        track: "reg_billing",
-      }).save({ session });
+//       const visit = await new Visits({
+//         uuid: visitUuid,
+//         patientId: patient.uuid,
+//         patientMongoose: patient._id,
+//         assignedDoctor,
+//         branch: `${req.user?.branchId}`,
+//         created_by: userId,
+//         track: "reg_billing",
+//       }).save({ session });
 
-      const paymentUuid = await getNextNumber({
-        base: `INV`,
-        clinicId: `${req.user?.clinicId}`,
-        branchId: `${req.user?.branchId}`,
-        session,
-      });
+//       const paymentUuid = await getNextNumber({
+//         base: `INV`,
+//         clinicId: `${req.user?.clinicId}`,
+//         branchId: `${req.user?.branchId}`,
+//         session,
+//       });
 
-      await new Payment({
-        uuid: paymentUuid,
-        patientId: patient._id,
-        branch: `${req.user?.branchId}`,
-        consultationFee,
-        created_by: userId,
-        visitId: visit._id,
-      }).save({ session });
+//       await new Payment({
+//         uuid: paymentUuid,
+//         patientId: patient._id,
+//         branch: `${req.user?.branchId}`,
+//         consultationFee,
+//         created_by: userId,
+//         visitId: visit._id,
+//       }).save({ session });
 
-      await Patient.findByIdAndUpdate(
-        patient._id,
-        { $push: { visits: visit._id } },
-        { session }
-      );
-      await Dept.findByIdAndUpdate(
-        departmentId,
-        { $push: { patients: visit.patientMongoose } },
-        { session }
-      );
-    }
+//       await Patient.findByIdAndUpdate(
+//         patient._id,
+//         { $push: { visits: visit._id } },
+//         { session }
+//       );
+//       await Dept.findByIdAndUpdate(
+//         departmentId,
+//         { $push: { patients: visit.patientMongoose } },
+//         { session }
+//       );
+//     }
   
-    await session.commitTransaction();
+//     await session.commitTransaction();
 
-    res.status(200).json({
-      message: "Visit saved successfully with CareTasks",
-      visit,
-    });
-  } catch (error: any) {
-    await session.abortTransaction();
-    console.error(error);
-    res.status(500).json({ error: error.message });
-  } finally {
-    session.endSession();
-  }
-};
+//     res.status(200).json({
+//       message: "Visit saved successfully with CareTasks",
+//       visit,
+//     });
+//   } catch (error: any) {
+//     await session.abortTransaction();
+//     console.error(error);
+//     res.status(500).json({ error: error.message });
+//   } finally {
+//     session.endSession();
+//   }
+// };
 
 export const createVisit = async (req: any, res: any) => {
   const session = await mongoose.startSession();
@@ -366,6 +366,8 @@ export const getvisits = async (req: AuthRequest, res: Response) => {
     const filter = buildVisitFilter({
       branchId: req.user?.branchId,
       track,
+      role: req.user?.role,
+      userId:req.user?.id,
     });
 
     const [visits, total] = await Promise.all([

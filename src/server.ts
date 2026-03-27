@@ -25,6 +25,7 @@ import patientMedications from './routes/patientMedication';
 import wardsRoute from './routes/wards';
 import paymentsRoute from './routes/payments';
 import paymentsCareRoute from './routes/tasks';
+import appointmentsRoute from './routes/appointments';
 
 import { runScanner } from './utils/runscaner';
 dotenv.config();
@@ -59,6 +60,7 @@ app.use('/api', Bedroutes);
 app.use('/api', wardsRoute);
 app.use('/api', paymentsRoute);
 app.use('/api', paymentsCareRoute);
+app.use('/api', appointmentsRoute);
 
 
 // Start

@@ -8,6 +8,7 @@ import Dept from '../models/deptModel';
 import { serialize } from "cookie";
 import bcrypt from "bcryptjs";
 
+import mongoose from "mongoose";
 
 import { jwtDecode } from "jwt-decode";
 import { MakeActivationCode } from '../utils/mkActivation';
@@ -25,6 +26,7 @@ export const login = async (req: Request, res: Response) => {
 
     const { phone_number, password } = req.body;
     let phone = await Format_phone_number(phone_number); //format the phone number
+    console.log(phone);
 
     const userExists: any = await User.findOne({
       $or: [
@@ -76,12 +78,11 @@ export const login = async (req: Request, res: Response) => {
 
 };
 
-import mongoose from "mongoose";
 
 export const register = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.id!;
   const session = await mongoose.startSession(); // start session
- 
+
   try {
     session.startTransaction(); // start transaction
 
@@ -93,11 +94,16 @@ export const register = async (req: AuthRequest, res: Response) => {
 
     // Format phone number
     const formattedPhone = await Format_phone_number(phone_number);
-
+    req.body.phone_number = formattedPhone;
     // 🔐 Hash password
     const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(password || formattedPhone, salt);
 
+    let hashedPassword
+    if (req.body.password) {
+      hashedPassword = await bcrypt.hash(password, salt);
+    } else {
+      hashedPassword = await bcrypt.hash(formattedPhone, salt);
+    }
     // Generate UUID inside transaction if not provided
     if (!uuid) {
       uuid = await getNextNumber({
@@ -131,7 +137,17 @@ export const register = async (req: AuthRequest, res: Response) => {
     // Upsert user
     // 🔐 Hash password
 
+    // Check for existing user with same phone or email
+    const existingUser = await User.findOne({
+      $or: [
+        { phone_number: formattedPhone },
+        ...(req.body.email ? [{ email: req.body.email }] : [])
+      ],
+    }).session(session);
 
+    if (existingUser) {
+      throw new Error("User with this phone number or email already exists");
+    }
     const user = await User.findOneAndUpdate(
       { uuid },
       {
@@ -146,7 +162,7 @@ export const register = async (req: AuthRequest, res: Response) => {
         ...(Object.keys(updateData).length && { $set: updateData }),
       },
 
-     {
+      {
         new: true,
         upsert: true,
         runValidators: true,
