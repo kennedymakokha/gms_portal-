@@ -6,7 +6,8 @@ export enum UserRole {
   admin = 'admin',
   doctor = 'doctor',
   nurse = 'nurse',
-  receptionist = 'receptionist'
+  receptionist = 'receptionist',
+  patient = 'patient'
 }
 // = 'admin' | 'doctor' | 'nurse' | 'receptionist';
 export interface IUser extends Document {
@@ -16,6 +17,7 @@ export interface IUser extends Document {
   role: UserRole;
   uuid: string
   department?: Schema.Types.ObjectId;
+  beneficiaries?: [Schema.Types.ObjectId];
   createdBy?: Schema.Types.ObjectId;
   branch?: Schema.Types.ObjectId;
   email?: string;
@@ -32,10 +34,13 @@ export interface IUser extends Document {
 
 const UserSchema = new Schema<IUser>({
   name: { type: String, required: true },
-  phone_number: { type: String, required: true, },
+  phone_number: { type: String, required: true,unique:true },
   password: { type: String, required: true },
-  email: { type: String },
+  email: { type: String,unique:true,sparse:true },
   experience: { type: Number },
+  beneficiaries: [
+    { type: Schema.Types.ObjectId, ref: 'User' }
+  ],
   qualification: { type: String },
   avatar: { type: String },
   schedule: { type: String },
