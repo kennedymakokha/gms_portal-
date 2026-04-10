@@ -194,6 +194,57 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const getPatientByID = async (req: AuthRequest, res: Response) => {
+  try {
+    const { page, limit, skip } = getPagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
+
+    const patientId = req.params.id;
+
+    // Find patient by ID
+    const patient = await Patient.findById(patientId)
+      .populate({
+        path: 'visits',
+        options: {
+          sort: { createdAt: -1 },
+          skip,
+          limit,
+        },
+        select: 'patientID assignedDoctor uuid patientMongoose createdAt',
+        populate: {
+          path: 'assignedDoctor',
+          select: 'name department uuid',
+          populate: {
+            path: 'department',
+            select: 'name fee uuid',
+          },
+        },
+      })
+      .lean();
+
+    if (!patient) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+
+    // Count total visits for pagination
+    const totalVisits = await Visits.countDocuments({ patientID: patientId });
+
+    res.status(200).json({
+      data: patient,
+      visitsPagination: {
+        total: totalVisits,
+        page,
+        limit,
+        totalPages: Math.ceil(totalVisits / limit),
+      },
+    });
+  } catch (error: any) {
+    console.error('Get patient by ID error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
 
 export const getpatients = async (req: AuthRequest, res: Response) => {
 

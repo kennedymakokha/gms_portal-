@@ -14,7 +14,7 @@ import { buildLabFilter, buildLabFilterByVisit } from './filters/labFilters';
 import Payment, { PaymentRecord } from '../models/paymentModal';
 import User from '../models/userModel';
 import CareTask from '../models/patientCareModal';
-
+import PatientsLab from '../models/patientlabsModal';
 
 interface Invoice {
   id: string;
@@ -40,8 +40,9 @@ interface InvoiceItem {
 
 
 import { v4 as uuidv4 } from "uuid";
-
+import Payments from '../models/paymentModal'
 import { Schema, model } from "mongoose";
+import patientProcedureModal from '../models/patientProcedureModal';
 
 export function getVitalStatus(vital: any): "normal" | "warning" | "critical" {
   if (
@@ -596,5 +597,68 @@ export const updateSingleLabTestStatus = async (req: Request, res: Response) => 
     session.endSession();
   }
 };
+
+
+
+export const getVisitReport = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Convert to ObjectId
+    const visitObjectId = new mongoose.Types.ObjectId(id);
+
+    const visit = await Visits.findById(visitObjectId)
+      .populate('patientMongoose')
+      .populate({
+          path: 'branch',
+          select: 'branchName phone_number address uuid clinic',
+          populate: [
+            {
+              path: 'clinic',
+              select: 'name uuid',
+             
+            },
+            
+          ],
+        })
+       
+      .populate('created_by')
+      .populate('vitalsNurseId')
+      .populate('assignedDoctor')
+      .populate('prescribedTests')
+      .populate('prescribedProcedures')
+      .populate('medications');
+
+    if (!visit) {
+      return res.status(404).json({ message: 'Visit not found' });
+    }
+
+    const patient = visit.patientMongoose;
+
+  const labs = await PatientsLab.find({ visitId: visitObjectId } as any)
+  .populate('testId')
+  .populate('labtechId');
+
+    const procedures = await patientProcedureModal.find({ visitId: visitObjectId }as any);
+    const invoice = await Payments.findOne({ visitId: visitObjectId }as any);
+
+    res.json({
+      success: true,
+      generatedAt: new Date(),
+      report: {
+        visit,
+        patient,
+        branch: visit.branch,
+        labs: labs || [],
+        procedures: procedures || [],
+        invoice: invoice || null,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error', error });
+  }
+};
+
 
 

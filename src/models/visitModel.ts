@@ -100,10 +100,7 @@ const visitSchema = new Schema<IVisits>(
       type: Date,
       default: null,
     },
-    branch: {
-      type: String,
-      required: true,
-    },
+    branch: { type: Schema.Types.ObjectId, ref: 'branch' },
     disposition: {
       type: String,
       default: '',

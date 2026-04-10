@@ -7,7 +7,9 @@ export enum UserRole {
   doctor = 'doctor',
   nurse = 'nurse',
   receptionist = 'receptionist',
-  patient = 'patient'
+  patient = 'patient',
+  lab_tech = 'lab_tech',
+  finance = 'finance'
 }
 // = 'admin' | 'doctor' | 'nurse' | 'receptionist';
 export interface IUser extends Document {
@@ -34,9 +36,9 @@ export interface IUser extends Document {
 
 const UserSchema = new Schema<IUser>({
   name: { type: String, required: true },
-  phone_number: { type: String, required: true,unique:true },
+  phone_number: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  email: { type: String,unique:true,sparse:true },
+  email: { type: String, unique: true, sparse: true },
   experience: { type: Number },
   beneficiaries: [
     { type: Schema.Types.ObjectId, ref: 'User' }
