@@ -3,7 +3,7 @@ import { Schema, model, Document } from 'mongoose';
 export interface IPatientMedications extends Document {
   patientId: string;
   uuid: string;
-  drugId: string;
+  medicationId: string;
   dosage: string;
   drugName: string;
   visitId: string;  
@@ -20,7 +20,7 @@ const patientMedicationsSchema = new Schema<IPatientMedications>({
   description: String,
   clinic: { type: Schema.Types.ObjectId, ref: 'Clinic' },
   created_by: { type: Schema.Types.ObjectId, ref: 'User' },
-  drugId: String,
+  medicationId: String,
   dosage: String,
   drugName: String,
   visitId: String,

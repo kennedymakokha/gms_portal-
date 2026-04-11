@@ -6,6 +6,7 @@ import Drugs from '../models/drugsModel';
 import { getPagination } from '../utils/pagination';
 import { parseQueryParam } from '../utils/queryParser';
 import { buildDrugFilter } from './filters/drugFilters';
+import MedicationModel from '../models/medicationModal';
 
 
 export const getDrugs = async (req: AuthRequest, res: Response) => {
@@ -23,13 +24,13 @@ export const getDrugs = async (req: AuthRequest, res: Response) => {
     });
 
     const [drugs, total] = await Promise.all([
-      Drugs.find(filter)
+      MedicationModel.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
 
-      Drugs.countDocuments(filter),
+      MedicationModel.countDocuments(filter),
     ]);
 
     res.status(200).json({
@@ -58,14 +59,32 @@ export const getDrugs = async (req: AuthRequest, res: Response) => {
 
 export const createDrug = async (req: AuthRequest, res: Response) => {
   try {
-    const { uuid, name, price, stock } = req.body;
-    const drug = await Drugs.findOneAndUpdate(
+    const { uuid,name,status,  genericName,
+          category,
+          dosageForm,
+          strength,
+          manufacturer,
+          batchNumber,
+          expiryDate,
+          quantityInStock,
+          reorderLevel,
+          unitPrice, } = req.body;
+    const drug = await MedicationModel.findOneAndUpdate(
       { uuid },
       {
         $set: {
           name,
-          price,
-          stock,
+          genericName,
+          category,
+          dosageForm,
+          strength,
+          manufacturer,
+          batchNumber,
+          expiryDate,
+          quantityInStock,
+          reorderLevel,
+          unitPrice,
+          status,
           clinic: req.user?.clinicId,
           isDeleted: req.body.isDeleted ?? false,
           updated_at: new Date(),
@@ -93,7 +112,7 @@ export const updateDrug = async (req: AuthRequest, res: Response) => {
   try {
     const { uuid } = req.params;
     const { name } = req.body;
-    const dept = await Drugs.findOneAndUpdate({ uuid }, { name }, { new: true });
+    const dept = await MedicationModel.findOneAndUpdate({ uuid }, { name }, { new: true });
     if (!dept) return res.status(404).json({ error: 'Drug not found' });
     res.json({ message: ' Drug updated', dept });
   } catch (error: any) {
@@ -109,7 +128,7 @@ export const harddeleteDrug = async (req: AuthRequest, res: Response) => {
     const { id } = req.params; // or uuid — whichever you chose
 
 
-    const dept = await Drugs.findOneAndDelete({ uuid: id });
+    const dept = await MedicationModel.findOneAndDelete({ uuid: id });
 
     if (!dept) {
       console.log(' No Drug found for uuid:', id);
@@ -127,7 +146,7 @@ export const deleteDrug = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const dept = await Drugs.findOneAndUpdate(
+    const dept = await MedicationModel.findOneAndUpdate(
       { uuid: id, isDeleted: false }, // only active Drugs
       {
         isDeleted: true,

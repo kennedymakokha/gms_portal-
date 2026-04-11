@@ -63,7 +63,7 @@ export const createPayment = async (req: AuthRequest, res: Response) => {
 
 
     // Ensure clinicId and created_by are ObjectId
-  
+
     const createdBy = req.user?.id ? new Types.ObjectId(req.user.id) : undefined;
 
     // Upsert payment
@@ -109,6 +109,8 @@ export const createPayment = async (req: AuthRequest, res: Response) => {
 
 export const getPayments = async (req: AuthRequest, res: Response) => {
   try {
+    // console.log(await Payments.find().populate("visitId"));
+    // console.log(await )
     // 1️⃣ Pagination
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
@@ -161,14 +163,17 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
           populate: [
             {
               path: 'assignedDoctor',
+              model: 'User', // Ensure this matches your Doctor/User model name
               select: 'name department',
               populate: {
                 path: 'department',
+                model: 'branch', // Or 'Department' depending on your schema
                 select: 'name consultationFee',
               },
             },
             {
               path: 'prescribedTests',
+              model: 'patientslab', // <--- CRITICAL: Must match the string in mongoose.model()
               select: 'testName price',
             }
           ]

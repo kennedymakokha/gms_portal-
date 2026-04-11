@@ -43,6 +43,8 @@ import { v4 as uuidv4 } from "uuid";
 import Payments from '../models/paymentModal'
 import { Schema, model } from "mongoose";
 import patientProcedureModal from '../models/patientProcedureModal';
+import patientmedicationsModel from '../models/patientmedicationsModel';
+import MedicationModel from '../models/medicationModal';
 
 export function getVitalStatus(vital: any): "normal" | "warning" | "critical" {
   if (
@@ -121,7 +123,7 @@ export function getVitalStatus(vital: any): "normal" | "warning" | "critical" {
 //         { session }
 //       );
 //     }
-  
+
 //     await session.commitTransaction();
 
 //     res.status(200).json({
@@ -199,6 +201,52 @@ export const createVisit = async (req: any, res: any) => {
       );
     }
 
+
+    // --- handle prescribed medications ---
+    if (Array.isArray(req.body.medications)) {
+      await patientmedicationsModel.deleteMany({ visitUuid: uuid }).session(session);
+
+      const medUuid = await getNextNumber({
+        base: `MED-ORD`,
+        clinicId: `${req.user?.clinicId}`,
+        branchId: `${req.user?.branchId}`,
+        session,
+      });
+
+      const insertedMeds = await patientmedicationsModel.insertMany(
+        req.body.medications.map((medId: string, index: number) => ({
+          medicationId: medId,
+          uuid: `${medUuid}/${index + 1}`,
+          visitId: req.body.visitId,
+          branch: `${req.user?.branchId}`,
+          patientMongoose,
+          patientId: req.body.patientId,
+          created_by: req.user?.id,
+        })),
+        { session }
+      );
+
+      for (let index = 0; index < insertedMeds.length; index++) {
+        const element = insertedMeds[index];
+        await Visits.findByIdAndUpdate(
+          req.body.visitId,
+          { $push: { medications: element._id } },
+          { session }
+        );
+      }
+
+      const meds = await MedicationModel.find({
+        _id: { $in: req.body.medications },
+      })
+        .select("price")
+        .session(session);
+
+      req.body.medFee = meds.reduce(
+        (sum: any, m) => sum + Number(m.unitPrice || 0),
+        0
+      );
+    }
+
     // --- allow update fields ---
     const ALLOWED_UPDATE_FIELDS = [
       "chiefComplaint",
@@ -206,6 +254,7 @@ export const createVisit = async (req: any, res: any) => {
       "notes",
       "track",
       "totallabTestFee",
+      "medications",
       "totalAmount",
       "isDeleted",
       "deletedAt",
@@ -270,7 +319,7 @@ export const createVisit = async (req: any, res: any) => {
     if (req.body.status !== undefined) {
       await Payment.findOneAndUpdate(
         { visitId: req.body.visitId },
-        { $set: { status: req.body.status } },
+        { $set: { status: req.body.status, medFee: req.body.medFee } },
         { session, new: true }
       );
     }
@@ -368,7 +417,7 @@ export const getvisits = async (req: AuthRequest, res: Response) => {
       branchId: req.user?.branchId,
       track,
       role: req.user?.role,
-      userId:req.user?.id,
+      userId: req.user?.id,
     });
 
     const [visits, total] = await Promise.all([
@@ -377,6 +426,7 @@ export const getvisits = async (req: AuthRequest, res: Response) => {
         .populate('created_by', 'name uuid')
         .populate('vitalsNurseId', 'name uuid')
         .populate('prescribedTests')
+        .populate('medications')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -610,18 +660,18 @@ export const getVisitReport = async (req: Request, res: Response) => {
     const visit = await Visits.findById(visitObjectId)
       .populate('patientMongoose')
       .populate({
-          path: 'branch',
-          select: 'branchName phone_number address uuid clinic',
-          populate: [
-            {
-              path: 'clinic',
-              select: 'name uuid',
-             
-            },
-            
-          ],
-        })
-       
+        path: 'branch',
+        select: 'branchName phone_number address uuid clinic',
+        populate: [
+          {
+            path: 'clinic',
+            select: 'name uuid',
+
+          },
+
+        ],
+      })
+
       .populate('created_by')
       .populate('vitalsNurseId')
       .populate('assignedDoctor')
@@ -635,12 +685,12 @@ export const getVisitReport = async (req: Request, res: Response) => {
 
     const patient = visit.patientMongoose;
 
-  const labs = await PatientsLab.find({ visitId: visitObjectId } as any)
-  .populate('testId')
-  .populate('labtechId');
+    const labs = await PatientsLab.find({ visitId: visitObjectId } as any)
+      .populate('testId')
+      .populate('labtechId');
 
-    const procedures = await patientProcedureModal.find({ visitId: visitObjectId }as any);
-    const invoice = await Payments.findOne({ visitId: visitObjectId }as any);
+    const procedures = await patientProcedureModal.find({ visitId: visitObjectId } as any);
+    const invoice = await Payments.findOne({ visitId: visitObjectId } as any);
 
     res.json({
       success: true,

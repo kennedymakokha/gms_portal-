@@ -13,7 +13,7 @@ export interface IVisits {
   diagnosis: string;     // diagnosis of the visit
   labOrders: string;     // lab orders for the visit
   pharmacyInstructions: string; // pharmacy instructions for the visit
-  track: 'registered' | 'reg_billing' | 'lab_billing' | 'med_billing' | 'ward_billing' | 'triage' | 'pre-lab' | 'post-lab' | 'lab' | 'pharmecy' | 'admitted';
+  track: 'registered' | 'reg_billing' | 'lab_billing' | 'med_billing' | 'ward_billing' | 'triage' | 'pre-lab' | 'post-lab' | 'lab' | 'pharmacy' | 'admitted';
   bp: string;            // blood pressure
   totalAmount: number;
   consultationFee: number;  // total amount billed for the visit
