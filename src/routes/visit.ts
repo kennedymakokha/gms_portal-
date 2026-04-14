@@ -14,4 +14,4 @@ router.get('/visits/lab-orders', authenticate, authorize([UserRole.admin,UserRol
 router.get('/visits/lab-orders/:id', authenticate, authorize([UserRole.admin,UserRole.doctor,UserRole.nurse]), getLabordersByVisit);      // Read
 
 
-export default router;
+export default router;  

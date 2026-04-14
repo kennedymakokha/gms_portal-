@@ -11,6 +11,7 @@ import { getPagination } from '../utils/pagination';
 import { parseQueryParam } from '../utils/queryParser';
 import { buildPatientFilter } from './filters/patientFilters';
 import bcrypt from "bcryptjs";
+import { getSocketIo } from '../config/socket';
 
 
 
@@ -180,6 +181,9 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
     }
 
     await session.commitTransaction();
+        const io = getSocketIo();
+        io?.emit("visit:update", patient);
+    
     session.endSession();
 
     return res.status(201).json({

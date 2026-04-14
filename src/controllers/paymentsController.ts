@@ -4,6 +4,7 @@ import Patient from '../models/patientModel';
 import Visits from '../models/visitModel';
 import Payments, { PaymentRecord } from '../models/paymentModal'
 import { Types } from "mongoose";
+import { getSocketIo } from '../config/socket';
 
 
 
@@ -93,7 +94,8 @@ export const createPayment = async (req: AuthRequest, res: Response) => {
         visitId ? Visits.findByIdAndUpdate(visitId, { track }) : null,
       ]);
     }
-
+    const io = getSocketIo();
+    io?.emit("update:payment", payment);
     res.status(200).json({
       message: "Payment saved successfully",
       payment,
