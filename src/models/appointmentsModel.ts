@@ -24,13 +24,13 @@ const AppointmentSchema = new Schema<Appointment>({
 
   date: { type: Date },
  
-  doctorId: { type: Schema.Types.ObjectId, ref: 'User' },
+  doctorId:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   time: { type: String },
   notes: { type: String },
   type: { type: String, default: "checkup" },
   status: { type: String, default: "scheduled" },
   clinic: { type: String },
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   uuid: { type: String, unique: true },
 
   isDeleted: {

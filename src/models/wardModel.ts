@@ -20,7 +20,7 @@ const WardSchema = new Schema<IWard>({
   type:{type:String,default:'general'},
   status: { type: String, default: "available" },
   clinic: { type: String },
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   uuid: { type: String, unique: true },
 
   isDeleted: {

@@ -22,7 +22,7 @@ const patientMedicationsSchema = new Schema<IPlabResults>({
   patientId: String,
   description: String,
   clinic: { type: Schema.Types.ObjectId, ref: 'Clinic' },
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   testId: String,
   price:String,
   testName: String,

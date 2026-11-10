@@ -40,7 +40,7 @@ const MedicationSchema = new Schema<Medication>({
     clinic: { type: String },
     reorderLevel: { type: Number },
     unitPrice: { type: Number },
-    created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
     status: { type: String, enum: ['in-stock', 'low-stock', 'out-of-stock', 'expired'], default: 'in-stock' },
     createdAt: { type: String },
     updatedAt: { type: String },

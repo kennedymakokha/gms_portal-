@@ -25,6 +25,7 @@ export const login = async (req: Request, res: Response) => {
     };
 
     const { phone_number, password } = req.body;
+    console.log(req.body);
     let phone = await Format_phone_number(phone_number); //format the phone number
     console.log(phone);
 
@@ -104,6 +105,8 @@ export const register = async (req: AuthRequest, res: Response) => {
     } else {
       hashedPassword = await bcrypt.hash(formattedPhone, salt);
     }
+
+ 
     // Generate UUID inside transaction if not provided
     if (!uuid) {
       uuid = await getNextNumber({
@@ -113,6 +116,7 @@ export const register = async (req: AuthRequest, res: Response) => {
         session,
       });
     }
+    
     const ALLOWED_UPDATE_FIELDS = [
       "name",
       "phone_number",
@@ -134,6 +138,7 @@ export const register = async (req: AuthRequest, res: Response) => {
         updateData[field] = req.body[field];
       }
     }
+    
     // Upsert user
     // 🔐 Hash password
 
@@ -170,7 +175,7 @@ export const register = async (req: AuthRequest, res: Response) => {
 
       }
     );
-
+  
     // Add user to department staff list
     await Dept.findByIdAndUpdate(
       department,

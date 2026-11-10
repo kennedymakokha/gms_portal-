@@ -69,7 +69,7 @@ const PatientSchema = new Schema<IPatient>(
 
     admissionDate: { type: Date, default: null },
 
-    visits: [{ type: Schema.Types.ObjectId, ref: "Visits" }],
+    visits: [{ type: Schema.Types.ObjectId, ref: "tb_visits" }],
 
     status: {
       type: String,
@@ -95,7 +95,7 @@ const PatientSchema = new Schema<IPatient>(
     history: { type: String },
     address: { type: String },
 
-    created_by: { type: Schema.Types.ObjectId, ref: "User" },
+    created_by: { type: Schema.Types.ObjectId, ref: "tb_user" },
 
     branch: {
       type: Schema.Types.ObjectId,

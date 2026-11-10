@@ -7,26 +7,15 @@ export interface IVisits {
   uuid: string;          // unique identifier for the visit
   patientId: string;   // reference to the patient (as string)
   patientMongoose: Schema.Types.ObjectId;   // reference to the patient (as string)
-  notes: string;         // optional notes about the visit
   branch: Schema.Types.ObjectId;        // reference to the branch (as string)
   disposition: string;   // disposition of the visit
   diagnosis: string;     // diagnosis of the visit
   labOrders: string;     // lab orders for the visit
   pharmacyInstructions: string; // pharmacy instructions for the visit
   track: 'registered' | 'reg_billing' | 'lab_billing' | 'med_billing' | 'ward_billing' | 'triage' | 'pre-lab' | 'post-lab' | 'lab' | 'pharmacy' | 'admitted';
-  bp: string;            // blood pressure
   totalAmount: number;
   consultationFee: number;  // total amount billed for the visit
-  temperature: string;   // temperature
-  pulse: string;         // pulse rate
-  respiratoryRate: string; // respiratory rate
-  // triage category
-  weight: string;        // weight of the patient
-  height: string;        // height of the patient
-  bmi: string;           // body mass index of the patient
   created_by: Schema.Types.ObjectId;
-
-  vitalsNurseId: Schema.Types.ObjectId;
   assignedDoctor?: Schema.Types.ObjectId;
   visitDate: Date | null;
   deletedAt?: Date | null;
@@ -39,7 +28,7 @@ export interface IVisits {
   testResults?: Record<string, string>;
   prescribedProcedures: string[];
   medications?: string[];
-  oxygenSaturation?: string
+ 
 
 }
 
@@ -54,19 +43,15 @@ const visitSchema = new Schema<IVisits>(
       unique: true,
       index: true,
     },
-    respiratoryRate: {
-      type: String,
-      default: '',
-    },
+   
     patientMongoose: { type: Schema.Types.ObjectId, ref: 'Patient' },
-    created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   
-    vitalsNurseId: { type: Schema.Types.ObjectId, ref: 'User' },
-
+    
     track: { type: String, default: 'registered' },
     assignedDoctor: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'tb_user',
       index: true,
     },
     totalAmount: {
@@ -74,9 +59,7 @@ const visitSchema = new Schema<IVisits>(
 
       default: 0,
     },
-    oxygenSaturation: {
-      type: String,
-    },
+  
     totallabTestFee: {
       type: Number,
 
@@ -92,10 +75,7 @@ const visitSchema = new Schema<IVisits>(
 
       index: true,
     },
-    notes: {
-      type: String,
-      default: '',
-    },
+    
     visitDate: {
       type: Date,
       default: null,
@@ -139,20 +119,7 @@ const visitSchema = new Schema<IVisits>(
         ref: 'procedure',
       },
     ],
-   
   
-    bp: {
-      type: String,
-      default: '',
-    },
-    temperature: {
-      type: String,
-      default: '',
-    },
-    pulse: {
-      type: String,
-      default: '',
-    },
   },
   { timestamps: true }
 );
@@ -160,6 +127,6 @@ const visitSchema = new Schema<IVisits>(
 // Model
 const Visits =
   mongoose.models.Visits ||
-  mongoose.model<IVisits>("Visits", visitSchema);
+  mongoose.model<IVisits>("tb_visits", visitSchema);
 
 export default Visits;

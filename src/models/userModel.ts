@@ -7,6 +7,7 @@ export enum UserRole {
   doctor = 'doctor',
   nurse = 'nurse',
   receptionist = 'receptionist',
+  pharmacist = 'pharmacist',
   patient = 'patient',
   lab_tech = 'lab_tech',
   finance = 'finance'
@@ -48,7 +49,7 @@ const UserSchema = new Schema<IUser>({
   schedule: { type: String },
   status: { type: String },
   uuid: { type: String, unique: true },
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'tb_user' },
   branch: { type: Schema.Types.ObjectId, ref: 'branch' },
   isDeleted: {
     type: Boolean,
@@ -77,4 +78,4 @@ UserSchema.methods.comparePassword = async function (candidate: string) {
   return bcrypt.compare(candidate, this.passwordHash);
 };
 
-export default model<IUser>('User', UserSchema);
+export default model<IUser>('tb_user', UserSchema);

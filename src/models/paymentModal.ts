@@ -35,9 +35,9 @@ export interface PaymentRecord extends Document {
 const invoiceSchema = new Schema<PaymentRecord>({
 
     uuid: { type: String, unique: true },
-    visitId: { type: Schema.Types.ObjectId, ref: 'Visits' },
+    visitId: { type: Schema.Types.ObjectId, ref: 'tb_visits' },
     patientId: { type: Schema.Types.ObjectId, ref: 'Patient' },
-    created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
     branch: { type: Schema.Types.ObjectId, ref: 'branch', index: true },
     consultationFee: { type: Number },
     labFee: { type: Number, default: 0 },

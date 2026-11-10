@@ -131,11 +131,11 @@ export const harddeleteDrug = async (req: AuthRequest, res: Response) => {
     const dept = await MedicationModel.findOneAndDelete({ uuid: id });
 
     if (!dept) {
-      console.log(' No Drug found for uuid:', id);
+      
       return res.status(404).json({ error: 'Drug not found' });
     }
 
-    console.log(' Deleted:', dept.uuid);
+   
     res.json({ message: ' Drug deleted' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

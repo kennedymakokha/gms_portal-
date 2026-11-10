@@ -151,7 +151,7 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
         created_by: userId,
         track: "reg_billing",
       }).save({ session });
-
+      console.log(visit);
       const paymentUuid = await getNextNumber({
         base: `INV`,
         clinicId: `${req.user?.clinicId}`,
@@ -181,9 +181,9 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
     }
 
     await session.commitTransaction();
-        const io = getSocketIo();
-        io?.emit("visit:update", patient);
-    
+    const io = getSocketIo();
+    io?.emit("visit:update", patient);
+
     session.endSession();
 
     return res.status(201).json({
@@ -310,10 +310,8 @@ export const getpatients = async (req: AuthRequest, res: Response) => {
 
 export const getPatientsOverview = async (req: AuthRequest, res: Response) => {
   try {
-
-
     const result = await Patient.find({
-      clinic: req.user?.branchId,
+      branch: req.user?.branchId,
       deletedAt: null,
       $or: [{ isDeleted: false }, { isDeleted: null }],
     }).select('name status assignedDoctor uuid')

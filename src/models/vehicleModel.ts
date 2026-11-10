@@ -16,7 +16,7 @@ const VehicleSchema = new Schema<IVehicle>({
   make: { type: String, required: true },
   car_model: { type: String, required: true },
   year: { type: Number, required: true },
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   owner_id: { type: Schema.Types.ObjectId, ref: 'Customer' },
   deletedAt: { type: Date, default: null }
 }, { timestamps: true });

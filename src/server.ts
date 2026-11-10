@@ -15,6 +15,7 @@ import path from "path";
 import departmentRoutes from './routes/department';
 import UserRoutes from './routes/user';
 import ClinicRoutes from './routes/clinic';
+import CategoriesRoutes from './routes/categories';
 import PatientRoutes from './routes/patient';
 import VisitRoutes from './routes/visit';
 import Drugroutes from './routes/drugs';
@@ -29,7 +30,12 @@ import wardsRoute from './routes/wards';
 import paymentsRoute from './routes/payments';
 import paymentsCareRoute from './routes/tasks';
 import appointmentsRoute from './routes/appointments';
-
+import medicineRoutes from "./routes/medicineRoutes";
+import salesRoutes from "./routes/salesRoutes";
+import purchaseRoutes from "./routes/purchaseRoutes";
+import customerRoutes from "./routes/customerRoutes";
+import supplierRoutes from "./routes/supplierRoutes";
+import prescriptionRoutes from "./routes/prescriptionRoutes";
 const dev = process.env.NODE_ENV !== 'production';
 
 const app = express();
@@ -37,6 +43,7 @@ const httpServer = createServer(app);
 
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:5173",
   "http://localhost:8080",
   "https://marapesa.com",
   "https://smartshop-api.marapesa.com",
@@ -80,6 +87,7 @@ connectDB();
 app.use('/api', departmentRoutes);
 app.use('/api', UserRoutes);
 app.use('/api', ClinicRoutes);
+app.use('/api', CategoriesRoutes);
 app.use('/api', PatientRoutes);
 app.use('/api', VisitRoutes);
 app.use('/api', Drugroutes);
@@ -94,6 +102,12 @@ app.use('/api', wardsRoute);
 app.use('/api', paymentsRoute);
 app.use('/api', paymentsCareRoute);
 app.use('/api', appointmentsRoute);
+app.use('/api/medicines', medicineRoutes);
+app.use("/api/sales", salesRoutes);
+app.use("/api/purchases", purchaseRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/suppliers", supplierRoutes);
+app.use("/api/prescriptions", prescriptionRoutes);
 app.get("/", (req, res) => {
   res.send("WebSocket Server is running!");
   return

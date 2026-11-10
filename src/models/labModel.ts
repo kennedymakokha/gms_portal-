@@ -19,7 +19,7 @@ export interface ILab {
 const LabSchema = new Schema<ILab>(
   {
     testName: { type: String, required: true },
-    created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
     branch: { type: Schema.Types.ObjectId, ref: 'branch' },
     uuid: { type: String, required: true },
     description: { type: String },

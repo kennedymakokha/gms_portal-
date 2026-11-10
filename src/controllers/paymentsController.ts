@@ -154,7 +154,8 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
         filter.track = track;
       }
     }
-
+const TrYpay = await Payments.find(filter).populate('visitId')
+console.log(TrYpay);
 
     const [payments, total] = await Promise.all([
       Payments.find(filter)
@@ -165,7 +166,7 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
           populate: [
             {
               path: 'assignedDoctor',
-              model: 'User', // Ensure this matches your Doctor/User model name
+              model: 'tb_user', // Ensure this matches your Doctor/User model name
               select: 'name department',
               populate: {
                 path: 'department',
@@ -200,6 +201,7 @@ export const getPayments = async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
+    console.log(error);
     res.status(500).json({ message: error.message });
   }
 };
