@@ -44,8 +44,8 @@ const httpServer = createServer(app);
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
-  "http://localhost:8080",
-  "https://marapesa.com",
+  "https://pharmacy.mtandao.app",
+  "https://pharmacy-web-iota.vercel.app",
   "https://smartshop-api.marapesa.com",
   "http://185.113.249.137:3000",
   "https://api.marapesa.com",
