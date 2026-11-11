@@ -5,7 +5,7 @@ import Pharmacys from '../models/PharmacyModel';
 
 import { getPagination } from '../utils/pagination';
 import { parseQueryParam } from '../utils/queryParser';
-import { buildPharmacyFilter } from './filters/pharmacyFilter';
+
 import MedicationModel from '../models/medicationModal';
 
 
@@ -27,7 +27,7 @@ export const getPharmacys = async (req: AuthRequest, res: Response) => {
         .limit(limit)
         .lean(),
 
-      MedicationModel.countDocuments(filter),
+      MedicationModel.countDocuments(),
     ]);
 
     res.status(200).json({
