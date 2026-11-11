@@ -5,7 +5,7 @@ import Pharmacys from '../models/PharmacyModel';
 
 import { getPagination } from '../utils/pagination';
 import { parseQueryParam } from '../utils/queryParser';
-import { buildPharmacyFilter } from './filters/PharmacyFilters';
+import { buildPharmacyFilter } from './filters/pharmacyFilter';
 import MedicationModel from '../models/medicationModal';
 
 
@@ -18,13 +18,10 @@ export const getPharmacys = async (req: AuthRequest, res: Response) => {
 
     const search = parseQueryParam(req.query.search as string);
 
-    const filter = buildPharmacyFilter({
-      clinicId: req.user?.clinicId,
-      search,
-    });
+ 
 
     const [Pharmacys, total] = await Promise.all([
-      MedicationModel.find(filter)
+      MedicationModel.find()
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
