@@ -1,11 +1,8 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import Pharmacys from '../models/PharmacyModel';
-
-
 import { getPagination } from '../utils/pagination';
 import { parseQueryParam } from '../utils/queryParser';
-
 import MedicationModel from '../models/medicationModal';
 
 
