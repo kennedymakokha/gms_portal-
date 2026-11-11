@@ -24,7 +24,7 @@ export interface IProcedure extends Document {
 
 const ProcedureScema = new Schema<IProcedure>({
   procedureName: { type: String, required: true, unique: true },
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   clinic: { type: String },
   category: { type: String },
   requiresAnesthesia: { type: Boolean },

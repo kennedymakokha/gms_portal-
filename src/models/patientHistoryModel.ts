@@ -15,7 +15,7 @@ const patientHistorySchema = new Schema<IPHistory>({
   patientId: String,
   description: String,
   clinic: { type: Schema.Types.ObjectId, ref: 'Clinic' },
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   uuid: { type: String, unique: true },
   sync_status: { type: Boolean, default: false },
   isDeleted: {

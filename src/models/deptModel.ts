@@ -17,8 +17,8 @@ export interface IDepartment extends Document {
 const DepartmentSchema = new Schema<IDepartment>({
   name: { type: String, required: true, unique: true },
   branch:  { type: Schema.Types.ObjectId, ref: 'branch' },
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
-  head: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
+  head:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   uuid: { type: String, unique: true },
   patients: [{ type: Schema.Types.ObjectId, ref: "Patient" }],
   staffs: [{ type: Schema.Types.ObjectId, ref: "Users" }],

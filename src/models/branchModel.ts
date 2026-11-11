@@ -3,13 +3,14 @@ import mongoose from 'mongoose';
 
 const branchSchema = new mongoose.Schema({
   branchName: { type: String, required: true, unique: true },
-  phone: { type: String, },
   uuid: { type: String, unique: true },
-  inpatient: { type: Boolean, default: false },
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
+  postalCode: { type: String, default: "100200" },
+  address: { type: String, default: "P.O. Box 123 Kiminini" },
+  phone_number:{type:String,default:"+2547354896"},
   clinic: { type: Schema.Types.ObjectId, ref: 'clinic' },
   departments: [{ type: Schema.Types.ObjectId, ref: "Department" }],
-  head: { type: Schema.Types.ObjectId, ref: 'User' },
+  head:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   isDeleted: {
     type: Boolean,
     default: false,

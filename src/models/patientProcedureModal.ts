@@ -22,7 +22,7 @@ const patientProceduresSchema = new Schema<IPprocedures>({
   patientId: String,
   description: String,
   clinic: { type: Schema.Types.ObjectId, ref: 'Clinic' },
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   procedureId: String,
   procedureName: String,
   price:String,

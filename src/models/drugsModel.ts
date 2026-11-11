@@ -23,7 +23,7 @@ const DrugSchema = new Schema<IDrug>({
   name: { type: String, required: true, unique: true },
   price: { type: String },
   clinic: { type: String },
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   uuid: { type: String, unique: true },
   stock: { type: Number },
   isDeleted: {
@@ -34,5 +34,5 @@ const DrugSchema = new Schema<IDrug>({
   deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
-export default model<IDrug>('drugs', DrugSchema);
+export default model<IDrug>('tb_drugs', DrugSchema);
 

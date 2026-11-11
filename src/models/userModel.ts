@@ -7,7 +7,10 @@ export enum UserRole {
   doctor = 'doctor',
   nurse = 'nurse',
   receptionist = 'receptionist',
-  patient = 'patient'
+  pharmacist = 'pharmacist',
+  patient = 'patient',
+  lab_tech = 'lab_tech',
+  finance = 'finance'
 }
 // = 'admin' | 'doctor' | 'nurse' | 'receptionist';
 export interface IUser extends Document {
@@ -34,9 +37,9 @@ export interface IUser extends Document {
 
 const UserSchema = new Schema<IUser>({
   name: { type: String, required: true },
-  phone_number: { type: String, required: true,unique:true },
+  phone_number: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  email: { type: String,unique:true,sparse:true },
+  email: { type: String, unique: true, sparse: true },
   experience: { type: Number },
   beneficiaries: [
     { type: Schema.Types.ObjectId, ref: 'User' }
@@ -46,7 +49,7 @@ const UserSchema = new Schema<IUser>({
   schedule: { type: String },
   status: { type: String },
   uuid: { type: String, unique: true },
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'tb_user' },
   branch: { type: Schema.Types.ObjectId, ref: 'branch' },
   isDeleted: {
     type: Boolean,
@@ -75,4 +78,4 @@ UserSchema.methods.comparePassword = async function (candidate: string) {
   return bcrypt.compare(candidate, this.passwordHash);
 };
 
-export default model<IUser>('User', UserSchema);
+export default model<IUser>('tb_user', UserSchema);

@@ -6,7 +6,7 @@ const customerSchema = new mongoose.Schema({
   phone: { type: String, },
   uuid: { type: String, unique: true },
 
-  created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+  created_by:  { type: Schema.Types.ObjectId, ref: 'tb_user' },
   isDeleted: {
     type: Boolean,
     default: false,

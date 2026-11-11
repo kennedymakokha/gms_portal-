@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node dist/server.js",
-    "dev": "ts-node src/server.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node -r dotenv/config dist/server.js",
+    "dev": "concurrently \"npx tsc --watch\" \"nodemon -q src/server.ts\"",
     "build": "tsc",
     "seed": "ts-node src/seed/seed.ts"
   },
@@ -15,6 +16,7 @@
   "type": "commonjs",
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
@@ -23,15 +25,19 @@
     "jwt-decode": "^4.0.0",
     "mongoose": "^9.1.2",
     "morgan": "^1.10.1",
+    "nodemon": "^3.1.14",
+    "socket.io": "^4.8.3",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/cookie": "^0.6.0",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^25.2.3",
+    "concurrently": "^9.2.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

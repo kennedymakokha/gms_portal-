@@ -14,7 +14,7 @@ import { buildLabFilter, buildLabFilterByVisit } from './filters/labFilters';
 import Payment, { PaymentRecord } from '../models/paymentModal';
 import User from '../models/userModel';
 import CareTask from '../models/patientCareModal';
-
+import PatientsLab from '../models/patientlabsModal';
 
 interface Invoice {
   id: string;
@@ -40,8 +40,13 @@ interface InvoiceItem {
 
 
 import { v4 as uuidv4 } from "uuid";
-
+import Payments from '../models/paymentModal'
 import { Schema, model } from "mongoose";
+import patientProcedureModal from '../models/patientProcedureModal';
+import patientmedicationsModel from '../models/patientmedicationsModel';
+import MedicationModel from '../models/medicationModal';
+import { Types } from 'mongoose';
+import { getSocketIo } from '../config/socket';
 
 export function getVitalStatus(vital: any): "normal" | "warning" | "critical" {
   if (
@@ -120,7 +125,7 @@ export function getVitalStatus(vital: any): "normal" | "warning" | "critical" {
 //         { session }
 //       );
 //     }
-  
+
 //     await session.commitTransaction();
 
 //     res.status(200).json({
@@ -136,6 +141,469 @@ export function getVitalStatus(vital: any): "normal" | "warning" | "critical" {
 //   }
 // };
 
+// export const createVisit = async (req: any, res: any) => {
+//   const session = await mongoose.startSession();
+//   interface IDepartment {
+//     _id: string;
+//     name: string;
+//     fee: number;
+//   }
+//   interface UserDocument {
+//     name: string;
+//     // department can be an ID OR the populated object
+//     department: Types.ObjectId | IDepartment;
+//   }
+
+//   function isPopulated(obj: any): obj is IDepartment {
+//     return obj && typeof obj.fee === 'number';
+//   }
+
+
+//   try {
+//     session.startTransaction();
+
+//     const {
+//       uuid,
+//       patientMongoose,
+//       prescribedTests,
+//       orderedBy,
+//       temperature,
+//       bloodPressureSystolic,
+//       bloodPressureDiastolic,
+//       heartRate,
+//       oxygenSaturation
+//     } = req.body;
+
+//     if (!uuid) {
+//       return res.status(400).json({ error: "uuid required" });
+//     }
+
+//     let visitId = req.body.visitId; // Existing ID for updates
+//     let assignedDoctor = orderedBy?._id || req.body.assignedDoctor;
+
+//     // --- 1. Handle New Visit Creation (without early return) ---
+//     if (req.body.track === "new-visit" || !visitId) {
+//       const doctor = await User.findById(assignedDoctor)
+//         .populate({ path: "department", select: "fee name" })
+//         .session(session);
+//       let fee
+//       if (doctor && isPopulated(doctor.department)) {
+//         fee = doctor.department.fee; // TypeScript is happy now
+//       }
+//       const newVisit = new Visits({
+//         uuid,
+//         patientMongoose: req.body._id,
+//         patientId: req.body.patientId,
+//         branch: req.user?.branchId,
+//         created_by: req.user?.id,
+//         assignedDoctor,
+//         status: "scheduled",
+//         track: "reg_billing", // Initial track for registration/billing
+//         consultationFee: fee || 0
+//       });
+
+//       const savedVisit = await newVisit.save({ session });
+//       console.log("VISIT",savedVisit);
+//       visitId = savedVisit._id;
+
+//       const updatedPatient = await Patient.findByIdAndUpdate(
+//         req.body._id,
+//         { $set: { track: "reg_billing" } },
+//         { session }
+//       );
+//       console.log("patient", updatedPatient);
+//       const newPayment = await Payment.create([{
+//         visitId: visitId,
+//         patientId: req.body.patientId,
+//         branch: req.user?.branchId,
+//         status: "pending",
+//         amount: fee || 0,
+//         created_by: req.user?.id,
+//       }], { session });
+//       console.log(newPayment);
+//     }
+
+//     // --- 2. Handle Lab Tests & Fees ---
+//     let totalLabFee = 0;
+//     if (Array.isArray(prescribedTests) && prescribedTests.length > 0) {
+//       await PatientLab.deleteMany({ visitUuid: uuid }).session(session);
+
+//       const testUUid = await getNextNumber({
+//         base: `LAB-ORD`,
+//         clinicId: `${req.user?.clinicId}`,
+//         branchId: `${req.user?.branchId}`,
+//         session,
+//       });
+
+//       const insertedTests = await PatientLab.insertMany(
+//         prescribedTests.map((testId: string, index: number) => ({
+//           testId,
+//           uuid: `${testUUid}/${index + 1}`,
+//           visitId: visitId,
+//           visitUuid: uuid,
+//           branch: `${req.user?.branchId}`,
+//           patientMongoose,
+//           patientId: req.body.patientId,
+//           created_by: req.user?.id,
+//         })),
+//         { session }
+//       );
+
+//       // Link IDs to Visit
+//       await Visits.findByIdAndUpdate(visitId, {
+//         $set: { prescribedTests: insertedTests.map(t => t._id) }
+//       }, { session });
+
+//       const labs = await Labs.find({ _id: { $in: prescribedTests } }).session(session);
+//       totalLabFee = labs.reduce((sum, l) => sum + Number(l.price || 0), 0);
+//     }
+
+//     // --- 3. Handle Medications & Fees ---
+//     let totalMedFee = 0;
+//     if (Array.isArray(req.body.medications) && req.body.medications.length > 0) {
+//       await patientmedicationsModel.deleteMany({ visitUuid: uuid }).session(session);
+
+//       const medUuid = await getNextNumber({
+//         base: `MED-ORD`,
+//         clinicId: `${req.user?.clinicId}`,
+//         branchId: `${req.user?.branchId}`,
+//         session,
+//       });
+
+//       const insertedMeds = await patientmedicationsModel.insertMany(
+//         req.body.medications.map((medId: string, index: number) => ({
+//           medicationId: medId,
+//           uuid: `${medUuid}/${index + 1}`,
+//           visitId: visitId,
+//           visitUuid: uuid,
+//           branch: `${req.user?.branchId}`,
+//           patientMongoose,
+//           patientId: req.body.patientId,
+//           created_by: req.user?.id,
+//         })),
+//         { session }
+//       );
+
+//       await Visits.findByIdAndUpdate(visitId, {
+//         $set: { medications: insertedMeds.map(m => m._id) }
+//       }, { session });
+
+//       const meds = await MedicationModel.find({ _id: { $in: req.body.medications } }).session(session);
+//       totalMedFee = meds.reduce((sum, m) => sum + Number(m.unitPrice || 0), 0);
+//     }
+
+//     // --- 4. Synchronize Visit Data ---
+//     const updateData: any = {
+//       ...req.body,
+//       totallabTestFee: totalLabFee,
+//       medFee: totalMedFee,
+//       totalAmount: (req.body.consultationFee || 0) + totalLabFee + totalMedFee
+//     };
+
+//     const finalVisit = await Visits.findOneAndUpdate(
+//       { uuid },
+//       { $set: updateData },
+//       { upsert: true, new: true, session }
+//     );
+
+//     // --- 5. SMART CareTasks (Triggered by vitals) ---
+//     if (patientMongoose) {
+//       const patient = await Patient.findById(patientMongoose).session(session);
+//       const tasks = [];
+
+//       if (temperature > 38) tasks.push({ task: `High Temp: ${temperature}°C`, priority: "high" });
+//       if (oxygenSaturation < 90) tasks.push({ task: `Low SpO2: ${oxygenSaturation}%`, priority: "high" });
+//       if (bloodPressureSystolic >= 140) tasks.push({ task: `Hypertension: ${bloodPressureSystolic}/${bloodPressureDiastolic}`, priority: "medium" });
+
+//       for (const t of tasks) {
+//         await new CareTask({
+//           uuid: uuidv4(),
+//           patientName: patient?.name,
+//           patientId: patient?._id,
+//           task: t.task,
+//           priority: t.priority,
+//           type: "vitals",
+//           branch: req.user?.branchId,
+//           created_by: req.user?.id,
+//           dueTime: new Date()
+//         }).save({ session });
+//       }
+//     }
+
+//     await session.commitTransaction();
+//     res.status(200).json({ message: "Success", visit: finalVisit });
+
+//   } catch (error: any) {
+//     console.log(error);
+//     await session.abortTransaction();
+//     res.status(500).json({ error: error.message });
+//   } finally {
+//     session.endSession();
+//   }
+// };
+// export const createVisit = async (req: any, res: any) => {
+//   const session = await mongoose.startSession();
+
+//   try {
+//     session.startTransaction();
+
+//     const { uuid, patientMongoose, prescribedTests, orderedBy, temperature, bloodPressureSystolic, bloodPressureDiastolic, heartRate, oxygenSaturation } = req.body;
+//     if (!uuid) {
+//       return res.status(400).json({ error: "uuid required" });
+//     }
+
+//     let assignedDoctor = orderedBy?._id;
+
+//     const doctor = await User.findById(assignedDoctor)
+//       .populate({ path: "department", select: "fee name" })
+//       .session(session);
+
+//     // --- handle prescribed tests ---
+//     if (Array.isArray(prescribedTests)) {
+//       await PatientLab.deleteMany({ visitUuid: uuid }).session(session);
+
+//       const testUUid = await getNextNumber({
+//         base: `LAB-ORD`,
+//         clinicId: `${req.user?.clinicId}`,
+//         branchId: `${req.user?.branchId}`,
+//         session,
+//       });
+
+//       const insertedTests = await PatientLab.insertMany(
+//         prescribedTests.map((testId: string, index: number) => ({
+//           testId,
+//           uuid: `${testUUid}/${index + 1}`,
+//           visitId: req.body.visitId,
+//           branch: `${req.user?.branchId}`,
+//           patientMongoose,
+//           patientId: req.body.patientId,
+//           created_by: req.user?.id,
+//         })),
+//         { session }
+//       );
+
+//       for (let index = 0; index < insertedTests.length; index++) {
+//         const element = insertedTests[index];
+//         await Visits.findByIdAndUpdate(
+//           req.body.visitId,
+//           { $push: { prescribedTests: element._id } },
+//           { session }
+//         );
+//       }
+
+//       const labs = await Labs.find({
+//         _id: { $in: prescribedTests },
+//       })
+//         .select("price")
+//         .session(session);
+
+//       req.body.totallabTestFee = labs.reduce(
+//         (sum: any, l) => sum + Number(l.price || 0),
+//         0
+//       );
+//     }
+
+
+//     // --- handle prescribed medications ---
+//     if (Array.isArray(req.body.medications)) {
+//       await patientmedicationsModel.deleteMany({ visitUuid: uuid }).session(session);
+
+//       const medUuid = await getNextNumber({
+//         base: `MED-ORD`,
+//         clinicId: `${req.user?.clinicId}`,
+//         branchId: `${req.user?.branchId}`,
+//         session,
+//       });
+
+//       const insertedMeds = await patientmedicationsModel.insertMany(
+//         req.body.medications.map((medId: string, index: number) => ({
+//           medicationId: medId,
+//           uuid: `${medUuid}/${index + 1}`,
+//           visitId: req.body.visitId,
+//           branch: `${req.user?.branchId}`,
+//           patientMongoose,
+//           patientId: req.body.patientId,
+//           created_by: req.user?.id,
+//         })),
+//         { session }
+//       );
+
+//       for (let index = 0; index < insertedMeds.length; index++) {
+//         const element = insertedMeds[index];
+//         await Visits.findByIdAndUpdate(
+//           req.body.visitId,
+//           { $push: { medications: element._id } },
+//           { session }
+//         );
+//       }
+
+//       const meds = await MedicationModel.find({
+//         _id: { $in: req.body.medications },
+//       })
+//         .select("price")
+//         .session(session);
+
+//       req.body.medFee = meds.reduce(
+//         (sum: any, m) => sum + Number(m.unitPrice || 0),
+//         0
+//       );
+//     }
+
+//     // --- allow update fields ---
+//     const ALLOWED_UPDATE_FIELDS = [
+//       "chiefComplaint",
+//       "symptoms",
+//       "notes",
+//       "track",
+//       "totallabTestFee",
+//       "medications",
+//       "totalAmount",
+//       "isDeleted",
+//       "deletedAt",
+//       "bp",
+//       "track",
+//       "temperature",
+//       "pulse",
+//       "respiratoryRate",
+//       "oxygenSaturation",
+//       "labtechId",
+//       "vitalsNurseId",
+//       "prescribedTests",
+//       "weight",
+//       "height",
+//       "bmi",
+//       "status",
+//     ];
+
+//     const updateData: any = {};
+//     for (const field of ALLOWED_UPDATE_FIELDS) {
+//       if (req.body[field] !== undefined) {
+//         updateData[field] = req.body[field];
+//       }
+//     }
+
+//     const visit = await Visits.findOneAndUpdate(
+//       { uuid },
+//       {
+//         $setOnInsert: {
+//           uuid,
+//           patientMongoose,
+//           patientId: req.body.patientId,
+//           branch: req.user?.branchId,
+//           created_by: req.user?.id,
+//         },
+//         ...(Object.keys(updateData).length && { $set: updateData }),
+//       },
+//       {
+//         upsert: true,
+//         new: true,
+//         runValidators: true,
+//         session,
+//       }
+//     );
+
+//     // --- sync patient & payment track ---
+//     if (patientMongoose && req.body.track !== undefined) {
+//       const patient: any = await Patient.findByIdAndUpdate(
+//         patientMongoose,
+//         { $set: { track: req.body.track } },
+//         { session, runValidators: true }
+//       );
+
+//       await Payment.findOneAndUpdate(
+//         { visitId: patient?.visits[0]?._id },
+//         { $set: { track: req.body.track } },
+//         { session, runValidators: true }
+//       );
+//     }
+
+//     // --- update payment status ---
+//     if (req.body.status !== undefined) {
+//       await Payment.findOneAndUpdate(
+//         { visitId: req.body.visitId },
+//         { $set: { status: req.body.status, medFee: req.body.medFee } },
+//         { session, new: true }
+//       );
+//     }
+
+//     // --- SMART CareTask CREATION ---
+//     const patient = await Patient.findById(patientMongoose).select("name room").session(session);
+
+//     if (patient && req.body.status) {
+//       const tasks: { task: string; priority: "high" | "medium" | "low" }[] = [];
+
+//       // Analyze vitals and create tasks
+//       if (temperature && (temperature < 36 || temperature > 38)) {
+//         tasks.push({
+//           task: `Temperature abnormal (${temperature}°C). Monitor and consider antipyretics if >38°C`,
+//           priority: req.body.status === "critical" ? "high" : "medium",
+//         });
+//       }
+
+//       if (bloodPressureSystolic && bloodPressureSystolic >= 140) {
+//         tasks.push({
+//           task: `Systolic BP high (${bloodPressureSystolic} mmHg). Monitor, inform physician, consider antihypertensives`,
+//           priority: req.body.status === "critical" ? "high" : "medium",
+//         });
+//       }
+
+//       if (bloodPressureDiastolic && bloodPressureDiastolic >= 90) {
+//         tasks.push({
+//           task: `Diastolic BP high (${bloodPressureDiastolic} mmHg). Monitor and manage accordingly`,
+//           priority: req.body.status === "critical" ? "high" : "medium",
+//         });
+//       }
+
+//       if (heartRate && (heartRate < 50 || heartRate > 120)) {
+//         tasks.push({
+//           task: `Abnormal heart rate (${heartRate} bpm). Monitor and report to physician`,
+//           priority: req.body.status === "critical" ? "high" : "medium",
+//         });
+//       }
+
+//       if (oxygenSaturation && oxygenSaturation < 90) {
+//         tasks.push({
+//           task: `Low SpO₂ (${oxygenSaturation}%). Administer oxygen, monitor, and alert physician`,
+//           priority: req.body.status === "critical" ? "high" : "medium",
+//         });
+//       }
+
+//       // Create CareTasks for all relevant abnormalities
+//       for (const t of tasks) {
+//         const careTask = new CareTask({
+//           uuid: uuidv4(),
+//           patientName: patient.name,
+//           patientId: patient._id,
+//           created_by: req.user?.id,
+//           assignedTo: null,
+//           branch: req.user?.branchId,
+//           room: patient.room ?? "Unknown",
+//           task: t.task,
+//           type: "vitals",
+//           priority: t.priority,
+//           dueTime: new Date().toISOString(),
+//           completed: false,
+//           completedAt: null,
+//         });
+//         await careTask.save({ session });
+
+//       }
+//     }
+
+//     await session.commitTransaction();
+
+//     res.status(200).json({
+//       message: "Visit saved successfully with CareTasks",
+//       visit,
+//     });
+//   } catch (error: any) {
+//     await session.abortTransaction();
+//     console.error(error);
+//     res.status(500).json({ error: error.message });
+//   } finally {
+//     session.endSession();
+//   }
+// };
 export const createVisit = async (req: any, res: any) => {
   const session = await mongoose.startSession();
 
@@ -339,6 +807,8 @@ export const createVisit = async (req: any, res: any) => {
     }
 
     await session.commitTransaction();
+    const io = getSocketIo();
+    io?.emit("update:visit", patient);
 
     res.status(200).json({
       message: "Visit saved successfully with CareTasks",
@@ -352,8 +822,6 @@ export const createVisit = async (req: any, res: any) => {
     session.endSession();
   }
 };
-
-
 export const getvisits = async (req: AuthRequest, res: Response) => {
   try {
     const { page, limit, skip } = getPagination(
@@ -367,7 +835,7 @@ export const getvisits = async (req: AuthRequest, res: Response) => {
       branchId: req.user?.branchId,
       track,
       role: req.user?.role,
-      userId:req.user?.id,
+      userId: req.user?.id,
     });
 
     const [visits, total] = await Promise.all([
@@ -376,6 +844,7 @@ export const getvisits = async (req: AuthRequest, res: Response) => {
         .populate('created_by', 'name uuid')
         .populate('vitalsNurseId', 'name uuid')
         .populate('prescribedTests')
+        .populate('medications')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -596,5 +1065,68 @@ export const updateSingleLabTestStatus = async (req: Request, res: Response) => 
     session.endSession();
   }
 };
+
+
+
+export const getVisitReport = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Convert to ObjectId
+    const visitObjectId = new mongoose.Types.ObjectId(id);
+
+    const visit = await Visits.findById(visitObjectId)
+      .populate('patientMongoose')
+      .populate({
+        path: 'branch',
+        select: 'branchName phone_number address uuid clinic',
+        populate: [
+          {
+            path: 'clinic',
+            select: 'name uuid',
+
+          },
+
+        ],
+      })
+
+      .populate('created_by')
+      .populate('vitalsNurseId')
+      .populate('assignedDoctor')
+      .populate('prescribedTests')
+      .populate('prescribedProcedures')
+      .populate('medications');
+
+    if (!visit) {
+      return res.status(404).json({ message: 'Visit not found' });
+    }
+
+    const patient = visit.patientMongoose;
+
+    const labs = await PatientsLab.find({ visitId: visitObjectId } as any)
+      .populate('testId')
+      .populate('labtechId');
+
+    const procedures = await patientProcedureModal.find({ visitId: visitObjectId } as any);
+    const invoice = await Payments.findOne({ visitId: visitObjectId } as any);
+
+    res.json({
+      success: true,
+      generatedAt: new Date(),
+      report: {
+        visit,
+        patient,
+        branch: visit.branch,
+        labs: labs || [],
+        procedures: procedures || [],
+        invoice: invoice || null,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error', error });
+  }
+};
+
 
 

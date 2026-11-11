@@ -1,17 +1,21 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import { connectDB } from './config/db';
-import routes from './routes';
-import bodyParser from 'body-parser';
+import dotenv from "dotenv";
+dotenv.config();
 
-import { execFile } from 'child_process';
+import express from "express";
+import { createServer } from "http";
+import { Server as IOServer } from "socket.io";
+import { setupSocket } from './config/socket';
+import { connectDB } from "./config/db";
+
+import bodyParser from "body-parser";
+import cookieParser from "cookie-parser";
+import cors from 'cors';
+import path from "path";
 
 import departmentRoutes from './routes/department';
 import UserRoutes from './routes/user';
 import ClinicRoutes from './routes/clinic';
+import CategoriesRoutes from './routes/categories';
 import PatientRoutes from './routes/patient';
 import VisitRoutes from './routes/visit';
 import Drugroutes from './routes/drugs';
@@ -26,27 +30,64 @@ import wardsRoute from './routes/wards';
 import paymentsRoute from './routes/payments';
 import paymentsCareRoute from './routes/tasks';
 import appointmentsRoute from './routes/appointments';
-
-import { runScanner } from './utils/runscaner';
-dotenv.config();
-const scannerPath = "/home/user/Downloads/FDx_SDK_Pro_Linux_v4.0c/FDx SDK Pro for Linux v4.0c/FDx_SDK_PRO_LINUX4_X64_4_0_0/bin/linux4X64/sgfplibtest";
+import medicineRoutes from "./routes/medicineRoutes";
+import salesRoutes from "./routes/salesRoutes";
+import purchaseRoutes from "./routes/purchaseRoutes";
+import customerRoutes from "./routes/customerRoutes";
+import supplierRoutes from "./routes/supplierRoutes";
+import prescriptionRoutes from "./routes/prescriptionRoutes";
+const dev = process.env.NODE_ENV !== 'production';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const httpServer = createServer(app);
+
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://pharmacy.mtandao.app",
+  "https://pharmacy-web-iota.vercel.app",
+  "https://smartshop-api.marapesa.com",
+  "http://185.113.249.137:3000",
+  "https://api.marapesa.com",
+  "https://a899-102-205-188-82.ngrok-free.app"
+];
+
+const io = new IOServer(httpServer, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
+  }
+});
 
 
-// Middleware
-app.use(helmet());
-app.use(cors());
-app.use(morgan('dev'));
-app.use(express.json());
+
+app.use("/uploads", express.static(path.join(__dirname, "../public/uploads")));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow Postman / mobile apps
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS not allowed for origin: ${origin}`));
+    }
+  },
+  credentials: true
+}));
+app.use(cookieParser());
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-// Routes
-// app.use('/api', routes);
+
+const PORT = Number(process.env.PORT) || 5000;
+
+connectDB();
+
 app.use('/api', departmentRoutes);
 app.use('/api', UserRoutes);
 app.use('/api', ClinicRoutes);
+app.use('/api', CategoriesRoutes);
 app.use('/api', PatientRoutes);
 app.use('/api', VisitRoutes);
 app.use('/api', Drugroutes);
@@ -61,15 +102,22 @@ app.use('/api', wardsRoute);
 app.use('/api', paymentsRoute);
 app.use('/api', paymentsCareRoute);
 app.use('/api', appointmentsRoute);
+app.use('/api/medicines', medicineRoutes);
+app.use("/api/sales", salesRoutes);
+app.use("/api/purchases", purchaseRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/suppliers", supplierRoutes);
+app.use("/api/prescriptions", prescriptionRoutes);
+app.get("/", (req, res) => {
+  res.send("WebSocket Server is running!");
+  return
+});
+app.use((req, res) => {
+  res.status(404).json({ message: 'API endpoint not found' });
+});
 
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Backend server running on http://localhost:${PORT}`);
+});
 
-// Start
-const start = async () => {
-  await connectDB();
-  app.listen(3000, '0.0.0.0', () => {
-    // app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-  });
-};
-
-start();
+setupSocket(io);
