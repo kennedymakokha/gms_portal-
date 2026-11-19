@@ -191,49 +191,65 @@ export const createMedicine = async (
         const validationError = validateMedicine(payload);
 
         if (validationError) {
-            return res.status(400).json({
+             res.status(400).json({
                 ok: false,
                 message: validationError,
             });
+            return
+        }
+
+        // Generate UUID if not provided
+        let uuid = req.body.uuid;
+
+        if (!uuid) {
+            const count = await Medicine.countDocuments();
+
+            uuid = `MED-${String(count + 1).padStart(5, "0")}-${Date.now()}`;
         }
 
         const exists = await categoryExists(payload.category);
 
         if (!exists) {
-            return res.status(400).json({
+            res.status(400).json({
                 ok: false,
                 message: "The selected category does not exist or has been deleted.",
             });
+            return
         }
 
         const medicine = await Medicine.create({
             ...payload,
+            uuid,
             category: new Types.ObjectId(payload.category),
-        });
+        } as any);
 
         const populatedMedicine = await Medicine.findById(
             medicine._id
         ).populate("category", "name uuid");
 
-        return res.status(201).json({
+        res.status(201).json({
             ok: true,
             message: "Medicine created successfully.",
             data: populatedMedicine,
         });
+        return
+
     } catch (error: any) {
         console.error("Create medicine error:", error);
 
         if (error.code === 11000) {
-            return res.status(409).json({
+             res.status(409).json({
                 ok: false,
-                message: "A medicine with this name and batch number already exists.",
+                message: "A medicine with this name, batch number or UUID already exists.",
             });
+            return
         }
 
-        return res.status(500).json({
+         res.status(500).json({
             ok: false,
             message: "Failed to create medicine.",
         });
+        return
     }
 };
 

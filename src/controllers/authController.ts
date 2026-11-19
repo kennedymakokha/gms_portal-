@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import User, { UserRole } from '../models/userModel';
+import User, { IUser, UserRole } from '../models/userModel';
 import { Format_phone_number } from '../utils/formatNUmber';
 import generateTokens from '../utils/generatetoken';
 
@@ -32,19 +32,23 @@ export const login = async (req: Request, res: Response) => {
     const userExists: any = await User.findOne({
       $or: [
         { username: phone_number },
-        { phone_number: phone }
-      ]
-    }).select("phone_number username name role activated password branch")
+        { phone_number: phone },
+      ],
+    })
+      .select(
+        "phone_number username name role activated password branch pharmacy"
+      )
+      .populate("pharmacy", "name phone_number email currency timezone settings")
       .populate({
-        path: 'branch',
-        select: 'clinic branchName inpatient phone',
+        path: "branch",
+        select: "clinic branchName inpatient phone",
         populate: [
           {
-            path: 'clinic',
-            select: 'name branch',
+            path: "clinic",
+            select: "name branch",
           },
         ],
-      })
+      });
     // .populate('clinic', 'branchName inpatient phone ');
 
     if (!userExists) {
@@ -86,7 +90,11 @@ export const register = async (req: AuthRequest, res: Response) => {
 
   try {
     session.startTransaction(); // start transaction
-
+    if (!req.user?.pharmacyId) {
+      return res.status(400).json({
+        message: "Your account is not associated with a pharmacy.",
+      });
+    }
     let {
       uuid,
       phone_number,
@@ -106,7 +114,7 @@ export const register = async (req: AuthRequest, res: Response) => {
       hashedPassword = await bcrypt.hash(formattedPhone, salt);
     }
 
- 
+
     // Generate UUID inside transaction if not provided
     if (!uuid) {
       uuid = await getNextNumber({
@@ -116,7 +124,7 @@ export const register = async (req: AuthRequest, res: Response) => {
         session,
       });
     }
-    
+
     const ALLOWED_UPDATE_FIELDS = [
       "name",
       "phone_number",
@@ -138,7 +146,7 @@ export const register = async (req: AuthRequest, res: Response) => {
         updateData[field] = req.body[field];
       }
     }
-    
+
     // Upsert user
     // 🔐 Hash password
 
@@ -158,11 +166,12 @@ export const register = async (req: AuthRequest, res: Response) => {
       {
         $setOnInsert: {
           uuid,
-          created_by: userId,
-          department: department,
-          branch: `${req.user?.branchId}`,
+          createdBy: userId,
+          department,
+          branch: req.user.branchId,
+          pharmacy: req.user.pharmacyId,
           password: hashedPassword,
-          created_at: new Date()
+          createdAt: new Date(),
         },
         ...(Object.keys(updateData).length && { $set: updateData }),
       },
@@ -175,7 +184,7 @@ export const register = async (req: AuthRequest, res: Response) => {
 
       }
     );
-  
+
     // Add user to department staff list
     await Dept.findByIdAndUpdate(
       department,
@@ -207,6 +216,7 @@ export const getUserOverview = async (req: AuthRequest, res: Response) => {
     const { role } = req.params
     // Base filter
     const filter: any = {
+      pharmacy: req.user?.pharmacyId,
       clinic: req.user?.clinicId,
       deletedAt: null,
       $or: [{ isDeleted: false }, { isDeleted: null }],
@@ -252,6 +262,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
 
     // ================= BASE FILTER =================
     const filter: Record<string, any> = {
+      pharmacy: req.user?.pharmacyId,
       branch: req.user?.branchId,
       deletedAt: null,
       $or: [{ isDeleted: false }, { isDeleted: null }],
@@ -311,11 +322,29 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
 
 export const updateUser = async (req: AuthRequest, res: Response) => {
   try {
-    const { uuid } = req.params;
-    const { name } = req.body;
-    const dept = await User.findOneAndUpdate({ uuid }, { name }, { new: true });
-    if (!dept) return res.status(404).json({ error: 'Department not found' });
-    res.json({ message: ' Department updated', dept });
+    const { id, } = req.params;
+
+    const user = await User.findOneAndUpdate(
+      {
+        _id: id,
+        pharmacy: req.user?.pharmacyId,
+      } as any,
+      { name: req.body.name },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      res.status(404).json({
+        message: "User not found",
+      });
+      return
+    }
+
+    res.json({
+      message: "User updated successfully",
+      user,
+    });
+    return
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

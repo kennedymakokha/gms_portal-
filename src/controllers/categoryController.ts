@@ -18,7 +18,7 @@ export const getCategories = async (req: AuthRequest, res: Response) => {
     const search = parseQueryParam(req.query.search as string);
 
     const filter = buildCategoryFilter({
-      
+
       search,
     });
 
@@ -58,17 +58,27 @@ export const getCategories = async (req: AuthRequest, res: Response) => {
 
 export const createCategory = async (req: AuthRequest, res: Response) => {
   try {
-    const { uuid,
-          name,
-          description,
-          } = req.body;
+    const {
+      uuid,
+      name,
+      description,
+    } = req.body;
+
+    // Generate UUID if not provided
+    let categoryUuid = uuid;
+
+    if (!categoryUuid) {
+      const count = await CategoriesModel.countDocuments();
+
+      categoryUuid = `CAT-${String(count + 1).padStart(5, "0")}-${Date.now()}`;
+    }
+
     const Category = await CategoriesModel.findOneAndUpdate(
-      { uuid },
+      { uuid: categoryUuid },
       {
         $set: {
           name,
           description,
-          // clinic: req.user?.clinicId,
           isDeleted: req.body.isDeleted ?? false,
           updated_at: new Date(),
         },
@@ -80,11 +90,14 @@ export const createCategory = async (req: AuthRequest, res: Response) => {
       {
         upsert: true,
         new: true,
+        setDefaultsOnInsert: true,
       }
     );
+
     res.status(201).json(Category);
+
   } catch (error: any) {
-    console.log(error)
+    console.log(error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -114,11 +127,11 @@ export const harddeletecategory = async (req: AuthRequest, res: Response) => {
     const cat = await CategoriesModel.findOneAndDelete({ uuid: id });
 
     if (!cat) {
-      
+
       return res.status(404).json({ error: 'Category not found' });
     }
 
-   
+
     res.json({ message: ' Category deleted' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -127,10 +140,10 @@ export const harddeletecategory = async (req: AuthRequest, res: Response) => {
 // soft Delete
 export const deleteCategory = async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const { uuid } = req.params;
 
     const cat = await CategoriesModel.findOneAndUpdate(
-      { uuid: id, isDeleted: false }, // only active Categories
+      { uuid, isDeleted: false }, // only active Categories
       {
         isDeleted: true,
         deletedAt: new Date(),

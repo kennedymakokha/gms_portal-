@@ -8,9 +8,10 @@ export interface AuthRequest extends Request {
     id: string;
     username?: string;
     role: UserRole;
-    clinicId?:string;
+    clinicId?: string;
     clinic?: any;
-    branchId?:string
+    pharmacyId?: string;
+    branchId?: string
   }
 }
 export const authenticate = (
@@ -35,8 +36,9 @@ export const authenticate = (
       id: string;
       username?: string;
       role: UserRole;
+      pharmacyId?: string;
       clinicId?: string;
-      branchId?:string
+      branchId?: string
     };
 
     // Attach to req.user
@@ -44,8 +46,9 @@ export const authenticate = (
       id: decoded.id,
       username: decoded.username,
       role: decoded.role,
+      pharmacyId: decoded.pharmacyId,
       clinicId: decoded.clinicId,
-       branchId: decoded.branchId,
+      branchId: decoded.branchId,
     };
 
     next();

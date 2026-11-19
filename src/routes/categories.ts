@@ -7,7 +7,7 @@ import { createCategory, deleteCategory, getCategories, updateCategory } from '.
 
 router.post('/categories', createCategory);   // Create
 router.get('/categories', getCategories);      // Read
-router.put('/categories/:id', authenticate, authorize([UserRole.admin]), updateCategory); // Update
-router.delete('/categories/:id', authenticate, authorize([UserRole.admin]), deleteCategory); // Delete
+router.put('/categories/:uuid', authenticate, authorize([UserRole.admin]), updateCategory); // Update
+router.delete('/categories/:uuid', authenticate, authorize([UserRole.admin]), deleteCategory); // Delete
 
 export default router;

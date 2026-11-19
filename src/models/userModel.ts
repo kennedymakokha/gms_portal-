@@ -16,6 +16,7 @@ export enum UserRole {
 export interface IUser extends Document {
   name: string;
   phone_number: string;
+  pharmacy?: Schema.Types.ObjectId;
   password: string;
   role: UserRole;
   uuid: string
@@ -50,6 +51,11 @@ const UserSchema = new Schema<IUser>({
   status: { type: String },
   uuid: { type: String, unique: true },
   createdBy: { type: Schema.Types.ObjectId, ref: 'tb_user' },
+  pharmacy: {
+    type: Schema.Types.ObjectId,
+    ref: "Pharmacy",
+    index: true,
+  },
   branch: { type: Schema.Types.ObjectId, ref: 'branch' },
   isDeleted: {
     type: Boolean,
@@ -62,11 +68,11 @@ const UserSchema = new Schema<IUser>({
   deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
-UserSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return
+UserSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-
 });
 // UserSchema.pre('save', async function (this: IUser) {
 //   if (!this.isModified('passwordHash')) return;
@@ -74,8 +80,10 @@ UserSchema.pre("save", async function (next) {
 //   this.passwordHash = await bcrypt.hash(this.passwordHash, 10);
 // });
 
-UserSchema.methods.comparePassword = async function (candidate: string) {
-  return bcrypt.compare(candidate, this.passwordHash);
+UserSchema.methods.comparePassword = async function (
+  candidate: string
+): Promise<boolean> {
+  return bcrypt.compare(candidate, this.password);
 };
 
 export default model<IUser>('tb_user', UserSchema);
