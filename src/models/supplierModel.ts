@@ -1,4 +1,5 @@
-import mongoose, { Document, Schema } from "mongoose";
+
+import mongoose, { Document, Schema, Types } from "mongoose";
 
 export interface ISupplier extends Document {
   name: string;
@@ -6,6 +7,7 @@ export interface ISupplier extends Document {
   email?: string;
   address?: string;
   contactPerson?: string;
+  pharmacy: Types.ObjectId;
   isDeleted: boolean;
   deletedAt?: Date | null;
 }
@@ -38,6 +40,12 @@ const supplierSchema = new Schema<ISupplier>(
       trim: true,
       default: "",
     },
+    pharmacy: {
+      type: Schema.Types.ObjectId,
+      ref: "Pharmacy",
+      required: true,
+      index: true,
+    },
     isDeleted: {
       type: Boolean,
       default: false,
@@ -51,7 +59,7 @@ const supplierSchema = new Schema<ISupplier>(
 );
 
 supplierSchema.index(
-  { phone: 1 },
+  { pharmacy: 1, phone: 1 },
   {
     unique: true,
     partialFilterExpression: { isDeleted: false },

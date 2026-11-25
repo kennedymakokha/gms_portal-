@@ -4,6 +4,7 @@ import { Schema, model, Document, Types } from "mongoose";
 export type PurchaseStatus = "Pending" | "Received";
 
 export interface IPurchase extends Document {
+  pharmacy: Types.ObjectId;
   orderNumber: string;
   supplier: string;
   medicine: Types.ObjectId;
@@ -17,11 +18,16 @@ export interface IPurchase extends Document {
 
 const PurchaseSchema = new Schema<IPurchase>(
   {
+    pharmacy: {
+      type: Schema.Types.ObjectId,
+      ref: "Pharmacy",
+      required: true,
+      index: true,
+    },
     orderNumber: {
       type: String,
       required: true,
-      unique: true,
-      index: true,
+      trim: true,
     },
     supplier: {
       type: String,
@@ -65,6 +71,11 @@ const PurchaseSchema = new Schema<IPurchase>(
     },
   },
   { timestamps: true }
+);
+
+PurchaseSchema.index(
+  { pharmacy: 1, orderNumber: 1 },
+  { unique: true }
 );
 
 export default model<IPurchase>("Purchase", PurchaseSchema);

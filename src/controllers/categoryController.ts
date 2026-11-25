@@ -1,15 +1,33 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
-import CategoriesModel from '../models/categoriesModel';
 
+import { Response } from "express";
+import { AuthRequest } from "../middleware/auth";
 
-import { getPagination } from '../utils/pagination';
-import { parseQueryParam } from '../utils/queryParser';
-import { buildCategoryFilter } from './filters/categoryFilters';
+import CategoriesModel from "../models/categoriesModel";
+import { getPagination } from "../utils/pagination";
+import { parseQueryParam } from "../utils/queryParser";
+import { buildCategoryFilter } from "./filters/categoryFilters";
 
+// Ensure every category operation is restricted to the authenticated pharmacy.
+const getPharmacyId = (req: AuthRequest, res: Response): string | null => {
+  const pharmacyId = req.user?.pharmacyId;
 
+  if (!pharmacyId) {
+    res.status(403).json({
+      message: "Your account is not assigned to a pharmacy",
+    });
+
+    return null;
+  }
+
+  return pharmacyId;
+};
+
+// GET CATEGORIES
 export const getCategories = async (req: AuthRequest, res: Response) => {
   try {
+    const pharmacyId = getPharmacyId(req, res);
+    if (!pharmacyId) return;
+
     const { page, limit, skip } = getPagination(
       req.query.page as string,
       req.query.limit as string
@@ -17,10 +35,11 @@ export const getCategories = async (req: AuthRequest, res: Response) => {
 
     const search = parseQueryParam(req.query.search as string);
 
-    const filter = buildCategoryFilter({
-
-      search,
-    });
+    const filter = {
+      ...buildCategoryFilter({ search }),
+      pharmacy: pharmacyId,
+      isDeleted: false,
+    };
 
     const [categories, total] = await Promise.all([
       CategoriesModel.find(filter)
@@ -32,7 +51,7 @@ export const getCategories = async (req: AuthRequest, res: Response) => {
       CategoriesModel.countDocuments(filter),
     ]);
 
-    res.status(200).json({
+    return res.status(200).json({
       data: categories,
       pagination: {
         total,
@@ -42,47 +61,52 @@ export const getCategories = async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Error fetching Categories:', error);
-    res.status(500).json({ message: error.message });
+    console.error("Error fetching Categories:", error);
+
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-// export const deleteAllCategories = async (req: AuthRequest, res: Response) => {
-//   try {
-//     await Categories.deleteMany({});
-//     res.json({ message: 'All Categories deleted successfully' });
-//   } catch (error: any) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
+// CREATE CATEGORY
 export const createCategory = async (req: AuthRequest, res: Response) => {
   try {
-    const {
-      uuid,
-      name,
-      description,
-    } = req.body;
+    const pharmacyId = getPharmacyId(req, res);
+    if (!pharmacyId) return;
 
-    // Generate UUID if not provided
+    const { uuid, name, description } = req.body;
+
+    if (!name || typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({
+        message: "Category name is required",
+      });
+    }
+
     let categoryUuid = uuid;
 
     if (!categoryUuid) {
-      const count = await CategoriesModel.countDocuments();
-
-      categoryUuid = `CAT-${String(count + 1).padStart(5, "0")}-${Date.now()}`;
+      categoryUuid = `CAT-${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 8)}`;
     }
 
-    const Category = await CategoriesModel.findOneAndUpdate(
-      { uuid: categoryUuid },
+    const category = await CategoriesModel.findOneAndUpdate(
+      {
+        pharmacy: pharmacyId,
+        uuid: categoryUuid,
+      },
       {
         $set: {
-          name,
-          description,
-          isDeleted: req.body.isDeleted ?? false,
+          name: name.trim(),
+          description: description || "",
+          isDeleted: false,
+          deletedAt: null,
           updated_at: new Date(),
         },
         $setOnInsert: {
+          pharmacy: pharmacyId,
+          uuid: categoryUuid,
           created_by: req.user?.id,
           created_at: new Date(),
         },
@@ -91,77 +115,160 @@ export const createCategory = async (req: AuthRequest, res: Response) => {
         upsert: true,
         new: true,
         setDefaultsOnInsert: true,
+        runValidators: true,
       }
     );
 
-    res.status(201).json(Category);
-
+    return res.status(201).json(category);
   } catch (error: any) {
-    console.log(error);
-    res.status(500).json({ message: error.message });
-  }
-};
+    console.error("Error creating category:", error);
 
-// controllers/DrugController.js
-
-export const updateCategory = async (req: AuthRequest, res: Response) => {
-  try {
-    const { uuid } = req.params;
-    const { name } = req.body;
-    const cat = await CategoriesModel.findOneAndUpdate({ uuid }, { name }, { new: true });
-    if (!cat) return res.status(404).json({ error: 'Category not found' });
-    res.json({ message: ' Category updated', cat });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// DELETE
-export const harddeletecategory = async (req: AuthRequest, res: Response) => {
-  try {
-
-
-    const { id } = req.params; // or uuid — whichever you chose
-
-
-    const cat = await CategoriesModel.findOneAndDelete({ uuid: id });
-
-    if (!cat) {
-
-      return res.status(404).json({ error: 'Category not found' });
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "A category with this name or identifier already exists",
+      });
     }
 
-
-    res.json({ message: ' Category deleted' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };
-// soft Delete
-export const deleteCategory = async (req: AuthRequest, res: Response) => {
+
+// UPDATE CATEGORY
+export const updateCategory = async (req: AuthRequest, res: Response) => {
   try {
+    const pharmacyId = getPharmacyId(req, res);
+    if (!pharmacyId) return;
+
     const { uuid } = req.params;
+    const { name, description } = req.body;
+
+    if (!name || typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({
+        message: "Category name is required",
+      });
+    }
 
     const cat = await CategoriesModel.findOneAndUpdate(
-      { uuid, isDeleted: false }, // only active Categories
       {
-        isDeleted: true,
-        deletedAt: new Date(),
+        uuid,
+        pharmacy: pharmacyId,
+        isDeleted: false,
       },
-      { new: true }
+      {
+        $set: {
+          name: name.trim(),
+          ...(description !== undefined ? { description } : {}),
+          updated_at: new Date(),
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
     );
 
     if (!cat) {
       return res.status(404).json({
-        error: 'Category not found or already deleted',
+        message: "Category not found",
       });
     }
 
-    res.json({
-      message: ' Category soft-deleted',
-      Category: cat,
+    return res.json({
+      message: "Category updated",
+      cat,
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error("Error updating category:", error);
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "A category with this name already exists",
+      });
+    }
+
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+// HARD DELETE CATEGORY
+export const harddeletecategory = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const pharmacyId = getPharmacyId(req, res);
+    if (!pharmacyId) return;
+
+    const { id } = req.params;
+
+    const cat = await CategoriesModel.findOneAndDelete({
+      uuid: id,
+      pharmacy: pharmacyId,
+    });
+
+    if (!cat) {
+      return res.status(404).json({
+        message: "Category not found",
+      });
+    }
+
+    return res.json({
+      message: "Category permanently deleted",
+    });
+  } catch (error: any) {
+    console.error("Error deleting category:", error);
+
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+// SOFT DELETE CATEGORY
+export const deleteCategory = async (req: AuthRequest, res: Response) => {
+  try {
+    const pharmacyId = getPharmacyId(req, res);
+    if (!pharmacyId) return;
+
+    const { uuid } = req.params;
+
+    const cat = await CategoriesModel.findOneAndUpdate(
+      {
+        uuid,
+        pharmacy: pharmacyId,
+        isDeleted: false,
+      },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          updated_at: new Date(),
+        },
+      },
+      {
+        new: true,
+      }
+    );
+
+    if (!cat) {
+      return res.status(404).json({
+        message: "Category not found or already deleted",
+      });
+    }
+
+    return res.json({
+      message: "Category soft-deleted",
+      category: cat,
+    });
+  } catch (error: any) {
+    console.error("Error soft-deleting category:", error);
+
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };

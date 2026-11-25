@@ -1,8 +1,19 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { Types } from "mongoose";
 
+import { AuthRequest } from "../middleware/auth";
 import Prescription from "../models/prescriptionModel";
 import Medicine from "../models/medicineModel";
+
+const getPharmacyId = (req: AuthRequest): Types.ObjectId | null => {
+  const pharmacyId = req.user?.pharmacyId;
+
+  if (!pharmacyId || !Types.ObjectId.isValid(pharmacyId)) {
+    return null;
+  }
+
+  return new Types.ObjectId(pharmacyId);
+};
 
 const generateReference = () => {
   const date = new Date();
@@ -13,17 +24,29 @@ const generateReference = () => {
   return `RX-${year}${month}${day}-${Date.now().toString().slice(-6)}`;
 };
 
+// GET ALL PRESCRIPTIONS
 export const getPrescriptions = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ) => {
   try {
+    const pharmacyId = getPharmacyId(req);
+
+    if (!pharmacyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy access is required",
+      });
+    }
+
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
     const search = String(req.query.search || "").trim();
     const status = String(req.query.status || "").trim();
 
-    const filter: any = {};
+    const filter: Record<string, any> = {
+      pharmacy: pharmacyId,
+    };
 
     if (status && ["Pending", "Verified"].includes(status)) {
       filter.status = status;
@@ -42,7 +65,11 @@ export const getPrescriptions = async (
 
     const [prescriptions, total] = await Promise.all([
       Prescription.find(filter)
-        .populate("medicine", "name batch")
+        .populate({
+          path: "medicine",
+          select: "name batch",
+          match: { pharmacy: pharmacyId },
+        })
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -71,11 +98,21 @@ export const getPrescriptions = async (
   }
 };
 
+// GET PRESCRIPTION BY ID
 export const getPrescriptionById = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ) => {
   try {
+    const pharmacyId = getPharmacyId(req);
+
+    if (!pharmacyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy access is required",
+      });
+    }
+
     if (!Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({
         success: false,
@@ -83,8 +120,14 @@ export const getPrescriptionById = async (
       });
     }
 
-    const prescription = await Prescription.findById(req.params.id)
-      .populate("medicine", "name batch");
+    const prescription = await Prescription.findOne({
+      _id: req.params.id,
+      pharmacy: pharmacyId,
+    }).populate({
+      path: "medicine",
+      select: "name batch",
+      match: { pharmacy: pharmacyId },
+    });
 
     if (!prescription) {
       return res.status(404).json({
@@ -107,11 +150,21 @@ export const getPrescriptionById = async (
   }
 };
 
+// CREATE PRESCRIPTION
 export const createPrescription = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ) => {
   try {
+    const pharmacyId = getPharmacyId(req);
+
+    if (!pharmacyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy access is required",
+      });
+    }
+
     const patient = String(req.body.patient || "").trim();
     const medicineId = String(req.body.medicine || "").trim();
     const notes = String(req.body.notes || "").trim();
@@ -131,14 +184,15 @@ export const createPrescription = async (
     }
 
     const medicine = await Medicine.findOne({
-      _id: medicineId,
+      _id: new Types.ObjectId(medicineId),
+      pharmacy: pharmacyId,
       isDeleted: { $ne: true },
     });
 
     if (!medicine) {
       return res.status(404).json({
         success: false,
-        message: "Medicine not found",
+        message: "Medicine not found in your pharmacy",
       });
     }
 
@@ -149,6 +203,7 @@ export const createPrescription = async (
       medicineName: medicine.name,
       notes,
       status: "Pending",
+      pharmacy: pharmacyId,
     });
 
     return res.status(201).json({
@@ -166,11 +221,21 @@ export const createPrescription = async (
   }
 };
 
+// VERIFY PRESCRIPTION
 export const verifyPrescription = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ) => {
   try {
+    const pharmacyId = getPharmacyId(req);
+
+    if (!pharmacyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy access is required",
+      });
+    }
+
     if (!Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({
         success: false,
@@ -181,6 +246,7 @@ export const verifyPrescription = async (
     const prescription = await Prescription.findOneAndUpdate(
       {
         _id: req.params.id,
+        pharmacy: pharmacyId,
         status: "Pending",
       },
       {
@@ -193,11 +259,16 @@ export const verifyPrescription = async (
         new: true,
         runValidators: true,
       }
-    ).populate("medicine", "name batch");
+    ).populate({
+      path: "medicine",
+      select: "name batch",
+      match: { pharmacy: pharmacyId },
+    });
 
     if (!prescription) {
       const existing = await Prescription.exists({
         _id: req.params.id,
+        pharmacy: pharmacyId,
       });
 
       return res.status(existing ? 409 : 404).json({

@@ -1,307 +1,518 @@
-import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
-import User, { IUser, UserRole } from '../models/userModel';
-import { Format_phone_number } from '../utils/formatNUmber';
-import generateTokens from '../utils/generatetoken';
 
-import Dept from '../models/deptModel';
-import { serialize } from "cookie";
-import bcrypt from "bcryptjs";
-
+import { Request, Response } from "express";
+import { Types } from "mongoose";
 import mongoose from "mongoose";
-
+import bcrypt from "bcryptjs";
+import { serialize } from "cookie";
 import { jwtDecode } from "jwt-decode";
-import { MakeActivationCode } from '../utils/mkActivation';
-import { AuthRequest } from '../middleware/auth';
-import { Query } from 'mongoose';
-import { generateSmartAbbreviation, getNextNumber } from '../utils/getNextNumber';
+import Department from '../models/deptModel';
+import User from "../models/userModel";
+import { AuthRequest } from "../middleware/auth";
+import { Format_phone_number } from "../utils/formatNUmber";
+import generateTokens from "../utils/generatetoken";
+import {
+  generateSmartAbbreviation,
+  getNextNumber,
+} from "../utils/getNextNumber";
 
-export const login = async (req: Request, res: Response) => {
+// ======================================================
+// HELPERS
+// ======================================================
 
-  try {
-    if (req.method !== "POST") {
-      res.status(405).json("Method Not Allowed")
-      return
-    };
+const getPharmacyId = (req: AuthRequest): Types.ObjectId | null => {
+  const pharmacyId = req.user?.pharmacyId;
 
-    const { phone_number, password } = req.body;
-    console.log(req.body);
-    let phone = await Format_phone_number(phone_number); //format the phone number
-    console.log(phone);
-
-    const userExists: any = await User.findOne({
-      $or: [
-        { username: phone_number },
-        { phone_number: phone },
-      ],
-    })
-      .select(
-        "phone_number username name role activated password branch pharmacy"
-      )
-      .populate("pharmacy", "name phone_number email currency timezone settings")
-      .populate({
-        path: "branch",
-        select: "clinic branchName inpatient phone",
-        populate: [
-          {
-            path: "clinic",
-            select: "name branch",
-          },
-        ],
-      });
-    // .populate('clinic', 'branchName inpatient phone ');
-
-    if (!userExists) {
-      res.status(400).json("User Not Found")
-      return
-    }
-
-    if (!userExists || !(await bcrypt.compare(password, userExists.password))) {
-      res.status(401).json("Invalid credentials");
-      return
-    } else {
-
-      const { accessToken } = generateTokens(userExists);
-      const decoded = jwtDecode(accessToken);
-
-      res.setHeader("Set-Cookie", serialize("sessionToken", accessToken, {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === "production", // Enable in production
-        sameSite: "lax",
-        path: "/",
-        maxAge: 3600, // 1 hour
-      }));
-
-      res.status(200).json({ ok: true, message: "Logged in", token: accessToken, exp: decoded?.exp, user: userExists });
-      return
-    }
-
-  } catch (error) {
-    console.log(error)
+  if (!pharmacyId || !Types.ObjectId.isValid(pharmacyId)) {
+    return null;
   }
 
-
+  return new Types.ObjectId(pharmacyId);
 };
+
+const cleanQuery = (value: unknown): string | undefined => {
+  if (
+    typeof value !== "string" ||
+    !value.trim() ||
+    value === "undefined" ||
+    value === "null"
+  ) {
+    return undefined;
+  }
+
+  return value.trim();
+};
+
+const escapeRegex = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// ======================================================
+// LOGIN
+// Global username login
+// ======================================================
+
+export const login = async (req: Request, res: Response) => {
+  try {
+    if (req.method !== "POST") {
+      return res.status(405).json({
+        success: false,
+        message: "Method Not Allowed",
+      });
+    }
+
+    const username = String(req.body.username || "")
+      .trim()
+      .toLowerCase();
+
+    const password = String(req.body.password || "");
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Username and password are required",
+      });
+    }
+
+    const userExists = await User.findOne({
+      username,
+      isDeleted: { $ne: true },
+    })
+      .select("+password")
+      .populate(
+        "pharmacy",
+        "name phone_number email currency timezone settings"
+      )
+      .populate({
+        path: "branch",
+        select: "pharmacy branchName address phone_number",
+        populate: {
+          path: "pharmacy",
+          select: "name phone_number email",
+        },
+      })
+
+    if (
+      !userExists ||
+      !(await bcrypt.compare(password, userExists.password))
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid username or password",
+      });
+    }
+
+    if (userExists.status === "inactive") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is inactive",
+      });
+    }
+
+    const { accessToken } = generateTokens(userExists);
+    const decoded = jwtDecode(accessToken);
+
+    res.setHeader(
+      "Set-Cookie",
+      serialize("sessionToken", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 3600,
+      })
+    );
+
+
+    // Never return the password hash
+    const { password: _password, ...userData } = userExists.toObject();
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged in successfully",
+      token: accessToken,
+      exp: decoded?.exp,
+      user: userData,
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Login failed",
+    });
+  }
+};
+
+// ======================================================
+// REGISTER USER
+// Pharmacy-scoped registration
+// ======================================================
 
 
 export const register = async (req: AuthRequest, res: Response) => {
-  const userId = req.user?.id!;
-  const session = await mongoose.startSession(); // start session
+  const pharmacyId = getPharmacyId(req);
+  const userId = req.user?.id;
+  const branchId = req.user?.branchId;
+
+  if (!pharmacyId) {
+    return res.status(403).json({
+      success: false,
+      message: "Your account is not associated with a pharmacy.",
+    });
+  }
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  if (!branchId) {
+    return res.status(403).json({
+      success: false,
+      message: "Your account is not associated with a branch.",
+    });
+  }
+
+  const session = await mongoose.startSession();
 
   try {
-    session.startTransaction(); // start transaction
-    if (!req.user?.pharmacyId) {
+    session.startTransaction();
+
+    const username = String(req.body.username || "")
+      .trim()
+      .toLowerCase();
+
+    const name = String(req.body.name || "").trim();
+
+    const phoneNumber = String(req.body.phone_number || "").trim();
+
+    const email = String(req.body.email || "")
+      .trim()
+      .toLowerCase();
+
+    const password = String(req.body.password || "");
+
+    const department = req.body.department || undefined;
+
+    const role = req.body.role || "pharmacist";
+
+    if (!username || !phoneNumber || !name) {
+      await session.abortTransaction();
+
       return res.status(400).json({
-        message: "Your account is not associated with a pharmacy.",
-      });
-    }
-    let {
-      uuid,
-      phone_number,
-      password,
-      department } = req.body;
-
-    // Format phone number
-    const formattedPhone = await Format_phone_number(phone_number);
-    req.body.phone_number = formattedPhone;
-    // 🔐 Hash password
-    const salt = await bcrypt.genSalt(12);
-
-    let hashedPassword
-    if (req.body.password) {
-      hashedPassword = await bcrypt.hash(password, salt);
-    } else {
-      hashedPassword = await bcrypt.hash(formattedPhone, salt);
-    }
-
-
-    // Generate UUID inside transaction if not provided
-    if (!uuid) {
-      uuid = await getNextNumber({
-        base: `${generateSmartAbbreviation(req.body.role)}`,
-        clinicId: `${req.user?.clinicId}`,
-        branchId: `${req.user?.branchId}`,
-        session,
+        success: false,
+        message: "Name, username and phone number are required.",
       });
     }
 
-    const ALLOWED_UPDATE_FIELDS = [
-      "name",
-      "phone_number",
-      "role",
-      "email",
-      "specialty",
-      "status",
-      "experience",
-      "qualification",
-      "avatar",
-      "schedule",
-      "isDeleted"
+    if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
+      await session.abortTransaction();
 
+      return res.status(400).json({
+        success: false,
+        message:
+          "Username must be 3-30 characters and contain only letters, numbers, dots, underscores or hyphens.",
+      });
+    }
+
+    if (password && password.length < 8) {
+      await session.abortTransaction();
+
+      return res.status(400).json({
+        success: false,
+        message: "Password must contain at least 8 characters.",
+      });
+    }
+
+    if (department && !Types.ObjectId.isValid(department)) {
+      await session.abortTransaction();
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid department ID.",
+      });
+    }
+
+    const allowedRoles = [
+      "admin",
+      "doctor",
+      "nurse",
+      "receptionist",
+      "pharmacist",
+      "patient",
+      "lab_tech",
+      "finance",
     ];
 
-    const updateData: any = {};
-    for (const field of ALLOWED_UPDATE_FIELDS) {
-      if (req.body[field] !== undefined) {
-        updateData[field] = req.body[field];
-      }
+    if (!allowedRoles.includes(role)) {
+      await session.abortTransaction();
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user role.",
+      });
     }
 
-    // Upsert user
-    // 🔐 Hash password
+    const formattedPhone = await Format_phone_number(phoneNumber);
 
-    // Check for existing user with same phone or email
+    // Check username globally and phone/email within this pharmacy.
     const existingUser = await User.findOne({
+      isDeleted: { $ne: true },
       $or: [
-        { phone_number: formattedPhone },
-        ...(req.body.email ? [{ email: req.body.email }] : [])
+        { username },
+        {
+          pharmacy: pharmacyId,
+          phone_number: formattedPhone,
+        },
+        ...(email
+          ? [
+            {
+              pharmacy: pharmacyId,
+              email,
+            },
+          ]
+          : []),
       ],
     }).session(session);
 
     if (existingUser) {
-      throw new Error("User with this phone number or email already exists");
-    }
-    const user = await User.findOneAndUpdate(
-      { uuid },
-      {
-        $setOnInsert: {
-          uuid,
-          createdBy: userId,
-          department,
-          branch: req.user.branchId,
-          pharmacy: req.user.pharmacyId,
-          password: hashedPassword,
-          createdAt: new Date(),
-        },
-        ...(Object.keys(updateData).length && { $set: updateData }),
-      },
+      await session.abortTransaction();
 
-      {
-        new: true,
-        upsert: true,
-        runValidators: true,
-        session,
+      let message = "User already exists.";
 
+      if (existingUser.username === username) {
+        message = "Username is already taken.";
+      } else if (existingUser.phone_number === formattedPhone) {
+        message = "Phone number already exists in this pharmacy.";
+      } else if (email && existingUser.email === email) {
+        message = "Email already exists in this pharmacy.";
       }
-    );
 
-    // Add user to department staff list
-    await Dept.findByIdAndUpdate(
+      return res.status(409).json({
+        success: false,
+        message,
+      });
+    }
+
+    // Validate department belongs to this pharmacy.
+    if (department) {
+      const departmentExists = await Department.findOne({
+        _id: department,
+        pharmacy: pharmacyId,
+        isDeleted: { $ne: true },
+      }).session(session);
+
+      if (!departmentExists) {
+        await session.abortTransaction();
+
+        return res.status(400).json({
+          success: false,
+          message: "Department does not exist in this pharmacy.",
+        });
+      }
+    }
+
+    // Generate pharmacy/branch-specific UUID.
+    let uuid = cleanQuery(req.body.uuid);
+
+    if (!uuid) {
+      uuid = await getNextNumber({
+        base: generateSmartAbbreviation(role),
+        pharmacyId: String(pharmacyId),
+        branchId: String(branchId),
+        session,
+      });
+    }
+
+    const existingUuid = await User.findOne({
+      pharmacy: pharmacyId,
+      uuid,
+      isDeleted: { $ne: true },
+    }).session(session);
+
+    if (existingUuid) {
+      await session.abortTransaction();
+
+      return res.status(409).json({
+        success: false,
+        message: "User UUID already exists in this pharmacy.",
+      });
+    }
+
+    // Never accept pharmacy or branch assignments from the request body.
+    const userData = {
+      username,
+      name,
+      phone_number: formattedPhone,
+      email: email || undefined,
+      uuid,
+      pharmacy: pharmacyId,
+      branch: branchId,
       department,
-      { $push: { staffs: user._id } },
-      { session } // attach session here
-    );
+      createdBy: userId,
+      role,
+      status: req.body.status || "active",
+      specialty: req.body.specialty || "",
+      experience: Number(req.body.experience) || 0,
+      qualification: req.body.qualification || "",
+      avatar: req.body.avatar || "",
+      schedule: req.body.schedule || "",
+      isDeleted: false,
+      deletedAt: null,
 
-    // Commit transaction
+      // The model's pre-save hook hashes this password.
+      password: password || formattedPhone,
+    };
+
+    const user = new User(userData);
+
+    await user.save({ session });
+
     await session.commitTransaction();
-    session.endSession();
+
+    const { password: _password, ...userWithoutPassword } =
+      user.toObject();
 
     return res.status(201).json({
-      ok: true,
-      message: "User registered successfully",
-      user
+      success: true,
+      message: "User registered successfully.",
+      user: userWithoutPassword,
     });
   } catch (error: any) {
-    // Rollback transaction
-    await session.abortTransaction();
-    session.endSession();
-    console.error(error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+
+    console.error("Register user error:", error);
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Username, phone number, email or UUID already exists.",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to register user.",
+    });
+  } finally {
+    await session.endSession();
   }
 };
 
-export const getUserOverview = async (req: AuthRequest, res: Response) => {
-  try {
+// ======================================================
+// USER OVERVIEW
+// ======================================================
 
-    const { role } = req.params
-    // Base filter
-    const filter: any = {
-      pharmacy: req.user?.pharmacyId,
-      clinic: req.user?.clinicId,
-      deletedAt: null,
-      $or: [{ isDeleted: false }, { isDeleted: null }],
+export const getUserOverview = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const pharmacyId = getPharmacyId(req);
+
+    if (!pharmacyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy access is required",
+      });
+    }
+
+    const { role } = req.params;
+
+    const filter: Record<string, any> = {
+      pharmacy: pharmacyId,
+      isDeleted: { $ne: true },
     };
 
-    // Optional role filter
     if (role) {
       filter.role = role;
     }
-    const result = await User.find(filter).select('name department specialty role')
 
+    const result = await User.find(filter)
+      .select("name username phone_number department specialty role status")
+      .populate("department", "name")
+      .sort({ name: 1 })
+      .lean();
 
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error("Get user overview error:", error);
 
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch user overview",
+    });
   }
 };
 
-export const getUsers = async (req: AuthRequest, res: Response) => {
-  try {
-    // ================= HELPERS =================
-    const cleanQuery = (value: unknown): string | undefined => {
-      if (
-        typeof value !== "string" ||
-        value.trim() === "" ||
-        value === "undefined" ||
-        value === "null"
-      ) {
-        return undefined;
-      }
-      return value.trim();
-    };
+// ======================================================
+// GET USERS
+// ======================================================
 
-    // ================= PAGINATION =================
-    const page = Math.max(Number(req.query.page) || 1, 1);
-    const limit = Math.max(Number(req.query.limit) || 10, 1);
+export const getUsers = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const pharmacyId = getPharmacyId(req);
+
+    if (!pharmacyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy access is required",
+      });
+    }
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
     const skip = (page - 1) * limit;
 
-    // ================= QUERY PARAMS =================
     const search = cleanQuery(req.query.search);
     const role = cleanQuery(req.query.role);
 
-    // ================= BASE FILTER =================
     const filter: Record<string, any> = {
-      pharmacy: req.user?.pharmacyId,
-      branch: req.user?.branchId,
-      deletedAt: null,
-      $or: [{ isDeleted: false }, { isDeleted: null }],
+      pharmacy: pharmacyId,
+      isDeleted: { $ne: true },
     };
 
-    // ================= OPTIONAL ROLE FILTER =================
     if (role) {
       filter.role = role;
     }
 
-    // ================= OPTIONAL SEARCH =================
     if (search) {
+      const regex = new RegExp(escapeRegex(search), "i");
+
       filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { phone_number: { $regex: search, $options: "i" } },
-        { nationalId: { $regex: search, $options: "i" } },
+        { name: regex },
+        { username: regex },
+        { phone_number: regex },
+        { email: regex },
+        { uuid: regex },
       ];
     }
 
-    // ================= DB QUERY =================
     const [users, total] = await Promise.all([
       User.find(filter)
+        .select("-password")
         .populate("department", "name")
+        .populate("branch", "branchName")
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
+
       User.countDocuments(filter),
     ]);
-    // for (let index = 0; index < users.length; index++) {
-    //   const element = users[index];
-    //   await Dept.findByIdAndUpdate(
-    //     element.department,
-    //     { $push: { staffs: element._id } },
 
-    //   );
-
-    // }
-    // ================= RESPONSE =================
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       data: users,
       pagination: {
         total,
@@ -312,120 +523,309 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
     });
   } catch (error: any) {
     console.error("Get users error:", error);
-    res.status(500).json({
+
+    return res.status(500).json({
+      success: false,
       message: "Failed to fetch users",
     });
   }
 };
 
+// ======================================================
+// UPDATE USER
+// ======================================================
 
-
-export const updateUser = async (req: AuthRequest, res: Response) => {
+export const updateUser = async (
+  req: AuthRequest,
+  res: Response
+) => {
   try {
-    const { id, } = req.params;
+    const pharmacyId = getPharmacyId(req);
+
+    if (!pharmacyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy access is required",
+      });
+    }
+
+    const { id } = req.params;
+
+    if (!id || !Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    const allowedFields = [
+      "name",
+      "phone_number",
+      "email",
+      "role",
+      "specialty",
+      "status",
+      "experience",
+      "qualification",
+      "avatar",
+      "schedule",
+      "department",
+      "branch",
+    ];
+
+    const updateData: Record<string, any> = {};
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+
+    if (updateData.phone_number) {
+      updateData.phone_number = await Format_phone_number(
+        updateData.phone_number
+      );
+    }
+
+    if (updateData.email !== undefined) {
+      updateData.email = String(updateData.email).trim().toLowerCase();
+    }
+
+    if (updateData.name !== undefined) {
+      updateData.name = String(updateData.name).trim();
+    }
+
+    if (updateData.department && !Types.ObjectId.isValid(updateData.department)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid department ID",
+      });
+    }
+
+    if (updateData.branch && !Types.ObjectId.isValid(updateData.branch)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid branch ID",
+      });
+    }
 
     const user = await User.findOneAndUpdate(
       {
         _id: id,
-        pharmacy: req.user?.pharmacyId,
-      } as any,
-      { name: req.body.name },
-      { new: true, runValidators: true }
-    );
-
-    if (!user) {
-      res.status(404).json({
-        message: "User not found",
-      });
-      return
-    }
-
-    res.json({
-      message: "User updated successfully",
-      user,
-    });
-    return
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// DELETE
-export const harddeleteUser = async (req: AuthRequest, res: Response) => {
-  try {
-
-
-    const { id } = req.params; // or uuid — whichever you chose
-
-
-    const dept = await User.findOneAndDelete({ uuid: id });
-
-    if (!dept) {
-
-      return res.status(404).json({ error: 'Department not found' });
-    }
-
-
-    res.json({ message: ' Department deleted' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-};
-// soft Delete
-export const deleteUser = async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({ error: 'User id is required' });
-    }
-
-    const user = await User.findOneAndUpdate(
-      { uuid: id, isDeleted: false },
-      {
-        isDeleted: true,
-        deletedAt: new Date(),
+        pharmacy: pharmacyId,
+        isDeleted: { $ne: true },
       },
-      { new: true }
-    );
+      {
+        $set: updateData,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).select("-password");
 
     if (!user) {
-      return res.status(405).json({
-        error: 'User not found or already deleted',
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
 
     return res.status(200).json({
-      message: ' User soft-deleted successfully',
+      success: true,
+      message: "User updated successfully",
       user,
     });
   } catch (error: any) {
-    console.error('Delete user error:', error);
+    console.error("Update user error:", error);
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Phone number or email already exists",
+      });
+    }
+
     return res.status(500).json({
-      error: 'Internal server error',
+      success: false,
+      message: "Failed to update user",
     });
   }
 };
 
-export const syncUsers = async (req: Request, res: Response) => {
+// ======================================================
+// HARD DELETE USER
+// ======================================================
+
+export const harddeleteUser = async (
+  req: AuthRequest,
+  res: Response
+) => {
   try {
+    const pharmacyId = getPharmacyId(req);
+
+    if (!pharmacyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy access is required",
+      });
+    }
+
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "User UUID is required",
+      });
+    }
+
+    const user = await User.findOneAndDelete({
+      uuid: id,
+      pharmacy: pharmacyId,
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User permanently deleted",
+    });
+  } catch (error: any) {
+    console.error("Hard delete user error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete user",
+    });
+  }
+};
+
+// ======================================================
+// SOFT DELETE USER
+// ======================================================
+
+export const deleteUser = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const pharmacyId = getPharmacyId(req);
+
+    if (!pharmacyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy access is required",
+      });
+    }
+
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "User UUID is required",
+      });
+    }
+
+    const user = await User.findOneAndUpdate(
+      {
+        uuid: id,
+        pharmacy: pharmacyId,
+        isDeleted: { $ne: true },
+      },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: new Date(),
+        },
+      },
+      {
+        new: true,
+      }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found or already deleted",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User soft-deleted successfully",
+      user,
+    });
+  } catch (error: any) {
+    console.error("Delete user error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete user",
+    });
+  }
+};
+
+// ======================================================
+// SYNC USERS
+// ======================================================
+
+export const syncUsers = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const pharmacyId = getPharmacyId(req);
+
+    if (!pharmacyId) {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy access is required",
+      });
+    }
+
     const since = Number(req.query.since || 0);
 
-    const users = await User.find({
-      updatedAt: { $gt: new Date(since) }
-    });
+    if (!Number.isFinite(since) || since < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid sync timestamp",
+      });
+    }
 
-    res.json(users.map((u: any) => ({
-      uuid: u.uuid,
-      name: u.name,
-      phone: u.phone,
-      role: u.role,
-      deptId: u.deptId,
-      deletedAt: u.deletedAt,
-      updatedAt: u.updatedAt
-    })));
-  } catch (err) {
-    res.status(500).json({ error: 'Sync failed' });
+    const users = await User.find({
+      pharmacy: pharmacyId,
+      updatedAt: { $gt: new Date(since) },
+    })
+      .select(
+        "uuid name phone_number role department deletedAt updatedAt isDeleted"
+      )
+      .lean();
+
+    return res.status(200).json(
+      users.map((user: any) => ({
+        uuid: user.uuid,
+        name: user.name,
+        phone_number: user.phone_number,
+        role: user.role,
+        department: user.department,
+        isDeleted: user.isDeleted,
+        deletedAt: user.deletedAt,
+        updatedAt: user.updatedAt,
+      }))
+    );
+  } catch (error) {
+    console.error("Sync users error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Sync failed",
+    });
   }
 };
-

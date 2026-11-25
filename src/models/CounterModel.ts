@@ -1,28 +1,35 @@
-import mongoose, { Schema, Document } from "mongoose";
+
+import mongoose, { Schema, Document, Types } from "mongoose";
 
 export interface ICounter extends Document {
-  clinic: mongoose.Types.ObjectId;
+  pharmacy: Types.ObjectId;
+  branch: Types.ObjectId;
   key: string;
   seq: number;
 }
 
-const CounterSchema: Schema = new Schema(
+const CounterSchema = new Schema<ICounter>(
   {
-    clinic: {
+    pharmacy: {
       type: Schema.Types.ObjectId,
+      ref: "Pharmacy",
       required: true,
-      ref: "Clinic",
+      index: true,
     },
+
     branch: {
       type: Schema.Types.ObjectId,
       ref: "branch",
       required: true,
       index: true,
     },
+
     key: {
       type: String,
       required: true,
+      trim: true,
     },
+
     seq: {
       type: Number,
       default: 0,
@@ -31,9 +38,15 @@ const CounterSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-// Prevent duplicate counters per clinic + key
-CounterSchema.index({ clinic: 1, key: 1 }, { unique: true });
+// One counter per pharmacy, branch and counter key.
+CounterSchema.index(
+  { pharmacy: 1, branch: 1, key: 1 },
+  { unique: true }
+);
 
-const Counter = mongoose.model<ICounter>("Counter", CounterSchema);
+const Counter = mongoose.model<ICounter>(
+  "Counter",
+  CounterSchema
+);
 
 export default Counter;

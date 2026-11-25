@@ -7,16 +7,17 @@ import {
   getMedicines,
   updateMedicine,
 } from "../controllers/medicineController";
-import { authenticate } from "../middleware/auth";
+import { authenticate, authorize } from "../middleware/auth";
+import { UserRole } from "../models/userModel";
 
 const router = express.Router();
 
 router.use(authenticate);
 
-router.get("/", getMedicines);
-router.get("/:id", getMedicineById);
-router.post("/", createMedicine);
-router.put("/:id", updateMedicine);
-router.delete("/:id", deleteMedicine);
+router.get("/", authorize([UserRole.admin, UserRole.pharmacist]), getMedicines);
+router.get("/:id", authenticate, authorize([UserRole.admin, UserRole.pharmacist]), getMedicineById);
+router.post("/", authenticate, authorize([UserRole.admin]), createMedicine);
+router.put("/:id", authenticate, authorize([UserRole.admin]), updateMedicine);
+router.delete("/:id", authenticate, authorize([UserRole.admin]), deleteMedicine);
 
 export default router;

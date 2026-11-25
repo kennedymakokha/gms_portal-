@@ -109,12 +109,13 @@ export const saveBranch = async (req: AuthRequest, res: Response) => {
     const clinicName = await Clinic.findById(clinic).session(session);
     // 🔢 Generate UUID only if creating new clinic
     if (!uuid) {
-      uuid = await getNextNumberWithoutBranch({
-        base: `${generateSmartAbbreviation(`${clinicName?.name}`)}`,
-        department:"BRC",
-        clinicId: clinic,
-        session,
-      });
+      uuid = "fhfhfhfhyfhfhgrfddd$"
+      // uuid = await getNextNumberWithoutBranch({
+      //   base: `${generateSmartAbbreviation(`${clinicName?.name}`)}`,
+      //   department:"BRC",
+      //   clinicId: clinic,
+      //   session,
+      // });
     }
     const ALLOWED_UPDATE_FIELDS = [
       "phone",
@@ -133,7 +134,7 @@ export const saveBranch = async (req: AuthRequest, res: Response) => {
         updateData[field] = req.body[field];
       }
     }
-console.log(req.body);
+    console.log(req.body);
 
     const branch = await Branch.findOneAndUpdate(
       { uuid },

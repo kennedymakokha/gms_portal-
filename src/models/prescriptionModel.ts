@@ -1,8 +1,10 @@
+
 import mongoose, { Document, Schema, Types } from "mongoose";
 
 export type PrescriptionStatus = "Pending" | "Verified";
 
 export interface IPrescription extends Document {
+  pharmacy: Types.ObjectId;
   reference: string;
   patient: string;
   medicine: Types.ObjectId;
@@ -14,10 +16,15 @@ export interface IPrescription extends Document {
 
 const prescriptionSchema = new Schema<IPrescription>(
   {
+    pharmacy: {
+      type: Schema.Types.ObjectId,
+      ref: "Pharmacy",
+      required: true,
+      index: true,
+    },
     reference: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     patient: {
@@ -53,12 +60,15 @@ const prescriptionSchema = new Schema<IPrescription>(
   { timestamps: true }
 );
 
-prescriptionSchema.index({ createdAt: -1 });
-prescriptionSchema.index({ patient: 1 });
+prescriptionSchema.index(
+  { pharmacy: 1, reference: 1 },
+  { unique: true }
+);
 
-const Prescription = mongoose.model<IPrescription>(
+prescriptionSchema.index({ pharmacy: 1, patient: 1 });
+prescriptionSchema.index({ pharmacy: 1, createdAt: -1 });
+
+export default mongoose.model<IPrescription>(
   "Prescription",
   prescriptionSchema
 );
-
-export default Prescription;

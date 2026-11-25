@@ -5,6 +5,7 @@ import { Types } from "mongoose";
 import Sale from "../models/salesModel";
 import Medicine from "../models/medicineModel";
 import Customer from "../models/customerModel";
+import { AuthRequest } from "../middleware/auth";
 type RequestedItem = {
     medicine: string;
     quantity: number;
@@ -80,17 +81,37 @@ export const getSaleById = async (req: Request, res: Response) => {
     }
 };
 
-export const createSale = async (req: Request, res: Response) => {
-    const deductedStock: Array<{ id: Types.ObjectId; quantity: number }> = [];
+
+export const createSale = async (req: AuthRequest, res: Response) => {
+    const deductedStock: Array<{
+        id: Types.ObjectId;
+        quantity: number;
+    }> = [];
+
+    let pharmacyId: Types.ObjectId;
 
     try {
+        // Get pharmacy from authenticated user.
+        const userPharmacyId = req.user?.pharmacyId;
+
+        if (!userPharmacyId || !Types.ObjectId.isValid(userPharmacyId)) {
+            return res.status(403).json({
+                success: false,
+                message: "Your account is not associated with a valid pharmacy.",
+            });
+        }
+
+        pharmacyId = new Types.ObjectId(userPharmacyId);
+
         const rawItems = req.body?.items as RequestedItem[];
+
         const customerId = req.body.customer
             ? String(req.body.customer).trim()
             : "";
 
         let selectedCustomer = null;
 
+        // Validate customer and ensure they belong to this pharmacy.
         if (customerId) {
             if (!Types.ObjectId.isValid(customerId)) {
                 return res.status(400).json({
@@ -101,16 +122,18 @@ export const createSale = async (req: Request, res: Response) => {
 
             selectedCustomer = await Customer.findOne({
                 _id: customerId,
+                pharmacy: pharmacyId,
                 isDeleted: { $ne: true },
             });
 
             if (!selectedCustomer) {
                 return res.status(404).json({
                     success: false,
-                    message: "Selected customer was not found",
+                    message: "Selected customer was not found in your pharmacy.",
                 });
             }
         }
+
         if (!Array.isArray(rawItems) || rawItems.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -118,7 +141,9 @@ export const createSale = async (req: Request, res: Response) => {
             });
         }
 
-        const paymentMethod = String(req.body?.paymentMethod || "").toLowerCase();
+        const paymentMethod = String(
+            req.body?.paymentMethod || ""
+        ).toLowerCase();
 
         if (!["cash", "mpesa", "card"].includes(paymentMethod)) {
             return res.status(400).json({
@@ -127,14 +152,14 @@ export const createSale = async (req: Request, res: Response) => {
             });
         }
 
-        // Combine duplicate medicine entries before checking stock.
+        // Combine duplicate medicine entries.
         const quantities = new Map<string, number>();
 
         for (const item of rawItems) {
             const medicineId = String(item?.medicine || "").trim();
             const quantity = Number(item?.quantity);
 
-            if (!isValidObjectId(medicineId)) {
+            if (!Types.ObjectId.isValid(medicineId)) {
                 return res.status(400).json({
                     success: false,
                     message: "A sale contains an invalid medicine.",
@@ -165,16 +190,18 @@ export const createSale = async (req: Request, res: Response) => {
 
         let totalAmount = 0;
 
+        // Validate medicines belonging to this pharmacy.
         for (const [medicineId, quantity] of quantities.entries()) {
             const medicine = await Medicine.findOne({
                 _id: medicineId,
+                pharmacy: pharmacyId,
                 isDeleted: { $ne: true },
             });
 
             if (!medicine) {
                 return res.status(404).json({
                     success: false,
-                    message: `Medicine ${medicineId} was not found.`,
+                    message: `Medicine ${medicineId} was not found in your pharmacy.`,
                 });
             }
 
@@ -219,15 +246,20 @@ export const createSale = async (req: Request, res: Response) => {
             });
         }
 
-        // Conditionally decrement stock to prevent selling more than is available.
+        // Deduct stock only from this pharmacy.
         for (const item of items) {
             const result = await Medicine.updateOne(
                 {
                     _id: item.medicine,
+                    pharmacy: pharmacyId,
                     isDeleted: { $ne: true },
                     quantity: { $gte: item.quantity },
                 },
-                { $inc: { quantity: -item.quantity } }
+                {
+                    $inc: {
+                        quantity: -item.quantity,
+                    },
+                }
             );
 
             if (result.modifiedCount !== 1) {
@@ -242,7 +274,9 @@ export const createSale = async (req: Request, res: Response) => {
             });
         }
 
+        // IMPORTANT: pharmacy is now included in Sale.create().
         const sale = await Sale.create({
+            pharmacy: pharmacyId,
             reference: makeReference(),
             items,
             customer: selectedCustomer?._id || null,
@@ -253,29 +287,46 @@ export const createSale = async (req: Request, res: Response) => {
             change: amountPaid - totalAmount,
             status: "completed",
         });
+
+        // Update customer visits within the same pharmacy.
         if (selectedCustomer) {
             try {
                 await Customer.updateOne(
-                    { _id: selectedCustomer._id },
-                    { $inc: { visits: 1 } }
+                    {
+                        _id: selectedCustomer._id,
+                        pharmacy: pharmacyId,
+                    },
+                    {
+                        $inc: { visits: 1 },
+                    }
                 );
             } catch (visitError) {
-                console.error("Failed to update customer visits:", visitError);
+                console.error(
+                    "Failed to update customer visits:",
+                    visitError
+                );
             }
         }
+
         return res.status(201).json({
             success: true,
             message: "Sale completed successfully.",
             data: sale,
         });
+
     } catch (error) {
-        // Restore any stock already deducted if the sale could not be saved.
-        if (deductedStock.length) {
+        // Restore deducted stock if sale creation fails.
+        if (deductedStock.length && pharmacyId!) {
             await Promise.all(
                 deductedStock.map(({ id, quantity }) =>
                     Medicine.updateOne(
-                        { _id: id },
-                        { $inc: { quantity } }
+                        {
+                            _id: id,
+                            pharmacy: pharmacyId,
+                        },
+                        {
+                            $inc: { quantity },
+                        }
                     )
                 )
             );
@@ -286,7 +337,10 @@ export const createSale = async (req: Request, res: Response) => {
         return res.status(400).json({
             success: false,
             message:
-                error instanceof Error ? error.message : "Failed to complete sale.",
+                error instanceof Error
+                    ? error.message
+                    : "Failed to complete sale.",
         });
     }
 };
+
