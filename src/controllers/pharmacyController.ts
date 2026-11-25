@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import Pharmacys from '../models/PharmacyModel';
+import Pharmacys from '../models/pharmacyModel';
 import { getPagination } from '../utils/pagination';
 import { parseQueryParam } from '../utils/queryParser';
 import MedicationModel from '../models/medicationModal';
@@ -15,7 +15,7 @@ export const getPharmacys = async (req: AuthRequest, res: Response) => {
 
     const search = parseQueryParam(req.query.search as string);
 
- 
+
 
     const [Pharmacys, total] = await Promise.all([
       MedicationModel.find()
@@ -47,11 +47,11 @@ export const getPharmacys = async (req: AuthRequest, res: Response) => {
 export const createPharmacy = async (req: AuthRequest, res: Response) => {
   try {
     const { uuid,
-          name,
-          phone_number,
-          email,
-          address,
-          } = req.body;
+      name,
+      phone_number,
+      email,
+      address,
+    } = req.body;
     const exists = await Pharmacys.findOneAndUpdate(
       { uuid },
       {
@@ -103,7 +103,7 @@ export const harddeletePharmacy = async (req: AuthRequest, res: Response) => {
     const { id } = req.params; // or uuid — whichever you chose
 
 
-    const pharm = await Pharmacys.findOneAndDelete({ uuid: id });
+    const pharm: any = await Pharmacys.findOneAndDelete({ uuid: id });
 
     if (!pharm) {
       console.log(' No Pharmacy found for uuid:', id);
@@ -121,7 +121,7 @@ export const deletePharmacy = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const pharm = await Pharmacys.findOneAndUpdate(
+    const pharm: any = await Pharmacys.findOneAndUpdate(
       { uuid: id, isDeleted: false }, // only active Pharmacys
       {
         isDeleted: true,
